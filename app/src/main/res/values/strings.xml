@@ -1,0 +1,129 @@
+<resources>
+    <string name="app_name">Rimalux</string>
+
+    <!-- Bottom / Rail Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_styles">Styles</string>
+    <string name="nav_palettes">Palettes</string>
+    <string name="nav_auto">Auto</string>
+
+    <!-- Header & Status -->
+    <string name="status_auto_short">Auto · %1$s</string>
+
+    <!-- Preview Overlays -->
+    <string name="cd_mockup_toggle">Toggle screen preview overlay</string>
+    <string name="cd_fullscreen_preview">Expand full-screen preview</string>
+    <string name="cd_close_fullscreen">Close full-screen preview</string>
+
+    <!-- Home Screen (Decluttered) -->
+    <string name="label_pitch_black_ratio">Pitch Black Ratio</string>
+    <string name="summary_styles_random">Styles: Random</string>
+    <string name="summary_styles_selected">Styles: %1$s</string>
+    <string name="summary_palette_random">Random · %1$s</string>
+    <string name="summary_palette_single">%1$s · %2$s</string>
+    <string name="summary_palette_list">%1$d Palettes · %2$s</string>
+    <string name="fill_short_solid">Solid</string>
+    <string name="fill_short_gradient">Gradient</string>
+
+    <string name="target_home">Wallpaper</string>
+    <string name="target_lock">Lock Screen</string>
+    <string name="target_both">Both</string>
+
+    <string name="btn_generate">Generate</string>
+    <string name="btn_set_wallpaper">Set Wallpaper</string>
+    <string name="btn_applying">Setting…</string>
+    <string name="toggle_auto_apply_on_generate">Auto-set when generating</string>
+
+    <!-- Styles Screen (16 Math Generative Art Styles) -->
+    <string name="styles_title">Math Art Styles</string>
+    <string name="styles_subtitle">Randomize across all 16 generative equations or multi-select favorites</string>
+    <string name="mode_randomized">Randomized</string>
+    <string name="mode_multiselect">Select Styles</string>
+    <string name="styles_random_active_hint">Synthesizes a random mathematical art style on each generation. Tap any card to preview or select.</string>
+    <string name="styles_multiselect_hint">Multi-select styles for rotation (%1$d of 16 selected)</string>
+    <string name="label_intricacy">Detail &amp; Intricacy</string>
+
+    <string name="style_silk_ribbons">Silk Flow Ribbons</string>
+    <string name="style_silk_ribbons_sub">Differential curl-field streamlines</string>
+    <string name="style_crystal_voronoi">Crystal Facets</string>
+    <string name="style_crystal_voronoi_sub">Beveled Delaunay gemstone shards</string>
+    <string name="style_sacred_mandala">Sacred Mandala</string>
+    <string name="style_sacred_mandala_sub">Polar rose harmonics &amp; lotus arches</string>
+    <string name="style_topo_contours">Topo Contours</string>
+    <string name="style_topo_contours_sub">Multi-octave elevation isolines</string>
+    <string name="style_guilloche_rosette">Guilloché Spiro</string>
+    <string name="style_guilloche_rosette_sub">Hypotrochoid moiré filigree</string>
+    <string name="style_isometric_monument">Isometric Prisms</string>
+    <string name="style_isometric_monument_sub">30° architectural stepped blocks</string>
+    <string name="style_bauhaus_construct">Bauhaus Construct</string>
+    <string name="style_bauhaus_construct_sub">Golden-ratio arcs &amp; fine louvres</string>
+    <string name="style_art_deco_sunburst">Art Deco Sunburst</string>
+    <string name="style_art_deco_sunburst_sub">Radiating fan arches &amp; spires</string>
+    <string name="style_origami_miura">Origami Miura</string>
+    <string name="style_origami_miura_sub">Pleated herringbone crease folds</string>
+    <string name="style_penrose_quasicrystal">Penrose Tiling</string>
+    <string name="style_penrose_quasicrystal_sub">Aperiodic φ-triangle quasicrystal</string>
+    <string name="style_fibonacci_lotus">Fibonacci Spiral</string>
+    <string name="style_fibonacci_lotus_sub">137.5° golden-angle petal vortex</string>
+    <string name="style_harmonic_cardioid">Harmonic Cardioid</string>
+    <string name="style_harmonic_cardioid_sub">Modular chord &amp; nephroid webs</string>
+    <string name="style_fractal_lattice">Fractal Weave</string>
+    <string name="style_fractal_lattice_sub">Recursive barycentric subdivision</string>
+    <string name="style_op_art_gravity">Op-Art Gravity</string>
+    <string name="style_op_art_gravity_sub">Lens-warped kinetic ribbons</string>
+    <string name="style_girih_starwork">Girih Starwork</string>
+    <string name="style_girih_starwork_sub">12-fold interlaced star rosettes</string>
+    <string name="style_horizon_waves">Horizon Strata</string>
+    <string name="style_horizon_waves_sub">Layered harmonic ridges &amp; eclipse</string>
+
+    <!-- Palettes Screen & Solid/Gradient Option -->
+    <string name="palettes_title">Colors &amp; Shading</string>
+    <string name="palettes_subtitle">Choose solid or gradient fills, random harmonies, or your palette list</string>
+    <string name="label_color_shading">Color Shading</string>
+    <string name="fill_mode_solid">Solid Colors</string>
+    <string name="fill_mode_gradient">Gradients</string>
+    <string name="palette_mode_random">Randomized</string>
+    <string name="palette_mode_list">Palette List</string>
+    <string name="random_palette_card_title">Random Color Harmony</string>
+    <string name="random_palette_card_desc">Synthesizes balanced, high-contrast color harmonies for every new wallpaper.</string>
+    <string name="btn_shuffle_colors">Shuffle Colors</string>
+    <string name="btn_save_random_to_list">Save to My List</string>
+
+    <string name="palette_list_hint">Select one or multiple palettes (%1$d active)</string>
+    <string name="btn_add_palette">Add Palette</string>
+    <string name="cd_delete_palette">Remove palette from list</string>
+
+    <!-- Create Palette Sheet -->
+    <string name="sheet_create_palette_title">New Palette</string>
+    <string name="label_palette_name">Palette Name</string>
+    <string name="placeholder_palette_name">e.g. Neon Dusk</string>
+    <string name="label_palette_swatches">Colors (%1$d / 6)</string>
+    <string name="btn_add_swatch">Add Color</string>
+    <string name="label_hex_code">HEX</string>
+    <string name="label_hue">Hue</string>
+    <string name="label_saturation">Saturation</string>
+    <string name="label_brightness">Brightness</string>
+    <string name="btn_save_palette">Add to List</string>
+    <string name="btn_cancel">Cancel</string>
+
+    <!-- Auto Interval Screen -->
+    <string name="auto_title">Automatic Interval</string>
+    <string name="auto_subtitle">Runs reliably in the background even when the app is closed</string>
+    <string name="auto_master_toggle">Auto-Change Wallpaper</string>
+    <string name="auto_next_in">Next change in %1$s</string>
+    <string name="auto_off_desc">Uses persistent OS background scheduling</string>
+    <string name="label_auto_target">Automatic Target</string>
+    <string name="label_interval">Interval</string>
+    <string name="btn_custom_interval">Custom…</string>
+    <string name="btn_run_now">Generate &amp; Set Now</string>
+    <string name="dialog_custom_interval_title">Custom Interval (Minutes)</string>
+    <string name="label_minutes_input">Minutes (1 – 10080)</string>
+    <string name="btn_confirm_interval">Save</string>
+    <string name="section_recent">Recent</string>
+
+    <!-- Feedback -->
+    <string name="msg_wallpaper_applied">Applied to %1$s · %2$d%% Pitch Black</string>
+    <string name="msg_wallpaper_error">Could not set wallpaper: %1$s</string>
+    <string name="msg_palette_saved">Added \"%1$s\" to palette list</string>
+    <string name="msg_schedule_updated">Auto-change every %1$s (%2$s)</string>
+</resources>
