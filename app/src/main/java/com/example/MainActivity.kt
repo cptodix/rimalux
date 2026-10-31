@@ -6,8 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.example.ui.VectraApp
-import com.example.ui.theme.VectraTheme
+import com.example.ui.RimaluxApp
+import com.example.ui.theme.RimaluxTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,8 +17,8 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
         setContent {
-            VectraTheme(darkTheme = true) {
-                VectraApp()
+            RimaluxTheme(darkTheme = true) {
+                RimaluxApp()
             }
         }
     }

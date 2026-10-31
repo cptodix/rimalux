@@ -1,6 +1,6 @@
 {
   "name": "Rimalux",
-  "description": "Procedural math-driven vector geometric wallpaper generator with OLED pitch-black ratio controls, custom palettes, and automated background rotation.",
+  "description": "Procedural math-driven vector geometric wallpaper generator with OLED true-black ratio controls, custom palettes, and automated background rotation.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

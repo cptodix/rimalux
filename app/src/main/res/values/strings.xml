@@ -1,24 +1,32 @@
 <resources>
     <string name="app_name">Rimalux</string>
 
-    <!-- Bottom / Rail Navigation -->
+    <!-- bottom / rail navigation -->
     <string name="nav_home">Home</string>
-    <string name="nav_styles">Styles</string>
-    <string name="nav_palettes">Palettes</string>
+    <string name="nav_patterns">Patterns</string>
+    <string name="nav_palettes">Colors</string>
     <string name="nav_auto">Auto</string>
 
-    <!-- Header & Status -->
-    <string name="status_auto_short">Auto · %1$s</string>
 
-    <!-- Preview Overlays -->
-    <string name="cd_mockup_toggle">Toggle screen preview overlay</string>
-    <string name="cd_fullscreen_preview">Expand full-screen preview</string>
-    <string name="cd_close_fullscreen">Close full-screen preview</string>
+    <!-- bottom sheet & preview overlays -->
+    <string name="status_loading_wallpaper">Loading…</string>
+    <string name="cd_bottom_sheet_handle">Settings sheet handle</string>
+    <string name="label_preview_overlay">Preview Overlay</string>
+    <string name="overlay_mode_none">Clean</string>
+    <string name="overlay_mode_lock">Lock Screen</string>
+    <string name="overlay_mode_icons">Home Icons</string>
 
-    <!-- Home Screen (Decluttered) -->
-    <string name="label_pitch_black_ratio">Pitch Black Ratio</string>
-    <string name="summary_styles_random">Styles: Random</string>
-    <string name="summary_styles_selected">Styles: %1$s</string>
+    <!-- home screen -->
+    <string name="label_pitch_black_ratio">True Black Ratio</string>
+    <string name="black_mode_single">Single Value</string>
+    <string name="black_mode_range">Range</string>
+    <string name="pitch_black_range_value">%1$d%% – %2$d%%</string>
+    <string name="pitch_black_active_now">Now %1$d%%</string>
+    <string name="preview_pending_changes_notice">Settings updated · Swipe left for next</string>
+    <string name="preview_true_black_percent">%1$d%% True Black</string>
+
+    <string name="summary_patterns_random">Random (%1$d)</string>
+    <string name="summary_patterns_selected">%1$s</string>
     <string name="summary_palette_random">Random · %1$s</string>
     <string name="summary_palette_single">%1$s · %2$s</string>
     <string name="summary_palette_list">%1$d Palettes · %2$s</string>
@@ -28,102 +36,308 @@
     <string name="target_home">Wallpaper</string>
     <string name="target_lock">Lock Screen</string>
     <string name="target_both">Both</string>
+    <string name="target_both_separate">Both Separate</string>
+    <string name="dialog_set_wallpaper_title">Apply Wallpaper To</string>
+    <string name="btn_save_to_device">Save to Device</string>
+    <string name="btn_share_wallpaper">Share</string>
+    <string name="share_chooser_title">Share Wallpaper</string>
+    <string name="share_wallpaper_subject">Rimalux · %1$s</string>
 
-    <string name="btn_generate">Generate</string>
-    <string name="btn_set_wallpaper">Set Wallpaper</string>
-    <string name="btn_applying">Setting…</string>
-    <string name="toggle_auto_apply_on_generate">Auto-set when generating</string>
+    <string name="btn_back">Back</string>
+    <string name="cd_navigate_back">Navigate back</string>
 
-    <!-- Styles Screen (16 Math Generative Art Styles) -->
-    <string name="styles_title">Math Art Styles</string>
-    <string name="styles_subtitle">Randomize across all 16 generative equations or multi-select favorites</string>
-    <string name="mode_randomized">Randomized</string>
-    <string name="mode_multiselect">Select Styles</string>
-    <string name="styles_random_active_hint">Synthesizes a random mathematical art style on each generation. Tap any card to preview or select.</string>
-    <string name="styles_multiselect_hint">Multi-select styles for rotation (%1$d of 16 selected)</string>
-    <string name="label_intricacy">Detail &amp; Intricacy</string>
+    <!-- patterns screen (64 procedural math patterns) -->
+    <string name="patterns_title">Patterns</string>
+    <string name="patterns_subtitle">Randomize across all %1$d procedural patterns or select your favorites.</string>
+    <string name="mode_randomized">Randomize All</string>
+    <string name="mode_multiselect">Select Custom</string>
+    <string name="patterns_multiselect_hint">Select custom patterns for generation (%1$d of %2$d selected)</string>
 
-    <string name="style_silk_ribbons">Silk Flow Ribbons</string>
-    <string name="style_silk_ribbons_sub">Differential curl-field streamlines</string>
-    <string name="style_crystal_voronoi">Crystal Facets</string>
-    <string name="style_crystal_voronoi_sub">Beveled Delaunay gemstone shards</string>
-    <string name="style_sacred_mandala">Sacred Mandala</string>
-    <string name="style_sacred_mandala_sub">Polar rose harmonics &amp; lotus arches</string>
-    <string name="style_topo_contours">Topo Contours</string>
-    <string name="style_topo_contours_sub">Multi-octave elevation isolines</string>
-    <string name="style_guilloche_rosette">Guilloché Spiro</string>
-    <string name="style_guilloche_rosette_sub">Hypotrochoid moiré filigree</string>
-    <string name="style_isometric_monument">Isometric Prisms</string>
-    <string name="style_isometric_monument_sub">30° architectural stepped blocks</string>
-    <string name="style_bauhaus_construct">Bauhaus Construct</string>
-    <string name="style_bauhaus_construct_sub">Golden-ratio arcs &amp; fine louvres</string>
-    <string name="style_art_deco_sunburst">Art Deco Sunburst</string>
-    <string name="style_art_deco_sunburst_sub">Radiating fan arches &amp; spires</string>
-    <string name="style_origami_miura">Origami Miura</string>
-    <string name="style_origami_miura_sub">Pleated herringbone crease folds</string>
-    <string name="style_penrose_quasicrystal">Penrose Tiling</string>
-    <string name="style_penrose_quasicrystal_sub">Aperiodic φ-triangle quasicrystal</string>
-    <string name="style_fibonacci_lotus">Fibonacci Spiral</string>
-    <string name="style_fibonacci_lotus_sub">137.5° golden-angle petal vortex</string>
-    <string name="style_harmonic_cardioid">Harmonic Cardioid</string>
-    <string name="style_harmonic_cardioid_sub">Modular chord &amp; nephroid webs</string>
-    <string name="style_fractal_lattice">Fractal Weave</string>
-    <string name="style_fractal_lattice_sub">Recursive barycentric subdivision</string>
-    <string name="style_op_art_gravity">Op-Art Gravity</string>
-    <string name="style_op_art_gravity_sub">Lens-warped kinetic ribbons</string>
-    <string name="style_girih_starwork">Girih Starwork</string>
-    <string name="style_girih_starwork_sub">12-fold interlaced star rosettes</string>
-    <string name="style_horizon_waves">Horizon Strata</string>
-    <string name="style_horizon_waves_sub">Layered harmonic ridges &amp; eclipse</string>
+    <string name="cat_all">All (%1$d)</string>
+    <string name="cat_flow">Flow &amp; Waves</string>
+    <string name="cat_symmetry">Symmetry &amp; Sacred</string>
+    <string name="cat_architectural">Architectural</string>
+    <string name="cat_tessellation">Tessellations</string>
 
-    <!-- Palettes Screen & Solid/Gradient Option -->
-    <string name="palettes_title">Colors &amp; Shading</string>
-    <string name="palettes_subtitle">Choose solid or gradient fills, random harmonies, or your palette list</string>
-    <string name="label_color_shading">Color Shading</string>
+    <!-- original 16 patterns -->
+    <string name="pattern_silk_ribbons">Silk Flow Ribbons</string>
+    <string name="pattern_silk_ribbons_sub">Differential curl-field streamlines</string>
+    <string name="pattern_crystal_voronoi">Crystal Facets</string>
+    <string name="pattern_crystal_voronoi_sub">Beveled Delaunay gemstone shards</string>
+    <string name="pattern_sacred_mandala">Sacred Mandala</string>
+    <string name="pattern_sacred_mandala_sub">Polar rose harmonics &amp; lotus arches</string>
+    <string name="pattern_topo_contours">Topo Contours</string>
+    <string name="pattern_topo_contours_sub">Multi-octave elevation isolines</string>
+    <string name="pattern_guilloche_rosette">Guilloché Spiro</string>
+    <string name="pattern_guilloche_rosette_sub">Hypotrochoid moiré filigree</string>
+    <string name="pattern_isometric_monument">Isometric Prisms</string>
+    <string name="pattern_isometric_monument_sub">30° architectural stepped blocks</string>
+    <string name="pattern_bauhaus_construct">Bauhaus Construct</string>
+    <string name="pattern_bauhaus_construct_sub">Golden-ratio arcs &amp; fine louvres</string>
+    <string name="pattern_art_deco_sunburst">Art Deco Sunburst</string>
+    <string name="pattern_art_deco_sunburst_sub">Radiating fan arches &amp; spires</string>
+    <string name="pattern_origami_miura">Origami Miura</string>
+    <string name="pattern_origami_miura_sub">Pleated herringbone crease folds</string>
+    <string name="pattern_penrose_quasicrystal">Penrose Tiling</string>
+    <string name="pattern_penrose_quasicrystal_sub">Aperiodic φ-triangle quasicrystal</string>
+    <string name="pattern_fibonacci_lotus">Fibonacci Spiral</string>
+    <string name="pattern_fibonacci_lotus_sub">137.5° golden-angle petal vortex</string>
+    <string name="pattern_harmonic_cardioid">Harmonic Cardioid</string>
+    <string name="pattern_harmonic_cardioid_sub">Modular chord &amp; nephroid webs</string>
+    <string name="pattern_fractal_lattice">Fractal Weave</string>
+    <string name="pattern_fractal_lattice_sub">Recursive barycentric subdivision</string>
+    <string name="pattern_op_art_gravity">Op-Art Gravity</string>
+    <string name="pattern_op_art_gravity_sub">Lens-warped kinetic ribbons</string>
+    <string name="pattern_girih_starwork">Girih Starwork</string>
+    <string name="pattern_girih_starwork_sub">12-fold interlaced star rosettes</string>
+    <string name="pattern_horizon_waves">Horizon Strata</string>
+    <string name="pattern_horizon_waves_sub">Layered harmonic ridges &amp; eclipse</string>
+
+    <!-- patterns #17 - #32 -->
+    <string name="pattern_lissajous_harmonic">Lissajous Harmonics</string>
+    <string name="pattern_lissajous_harmonic_sub">Phase-locked orbital wave ribbons</string>
+    <string name="pattern_logarithmic_nautilus">Golden Nautilus</string>
+    <string name="pattern_logarithmic_nautilus_sub">Equiangular spiral chamber septa</string>
+    <string name="pattern_chladni_cymatics">Chladni Cymatics</string>
+    <string name="pattern_chladni_cymatics_sub">Acoustic standing-wave nodal cells</string>
+    <string name="pattern_moire_interference">Moiré Interference</string>
+    <string name="pattern_moire_interference_sub">Dual-focus wave ring resonance</string>
+    <string name="pattern_magnetic_dipole">Magnetic Flux</string>
+    <string name="pattern_magnetic_dipole_sub">Bipolar vector field streamlines</string>
+    <string name="pattern_aurora_curtains">Borealis Drapery</string>
+    <string name="pattern_aurora_curtains_sub">Vertical harmonic sky curtains</string>
+    <string name="pattern_apollonian_circles">Apollonian Rings</string>
+    <string name="pattern_apollonian_circles_sub">Tangent circle &amp; crescent packing</string>
+    <string name="pattern_shattered_geode">Agate Geode</string>
+    <string name="pattern_shattered_geode_sub">Crystalline mineral ring strata</string>
+    <string name="pattern_voronoi_stained_glass">Cathedral Glass</string>
+    <string name="pattern_voronoi_stained_glass_sub">Polygonal Voronoi leaded jewels</string>
+    <string name="pattern_hex_honeycomb_prism">Hexagonal Matrix</string>
+    <string name="pattern_hex_honeycomb_prism_sub">Nested 6-fold rhombic prism cells</string>
+    <string name="pattern_truchet_labyrinth">Truchet Meander</string>
+    <string name="pattern_truchet_labyrinth_sub">Seamless quarter-arc ribbon paths</string>
+    <string name="pattern_superellipse_nest">Lamé Superellipses</string>
+    <string name="pattern_superellipse_nest_sub">Twisted Piet Hein squircle rings</string>
+    <string name="pattern_kaleidoscope_prism">Mirror Kaleidoscope</string>
+    <string name="pattern_kaleidoscope_prism_sub">Dihedral symmetrical shard facets</string>
+    <string name="pattern_hyperbolic_poincare">Poincaré Geodesics</string>
+    <string name="pattern_hyperbolic_poincare_sub">Hyperbolic disk orthogonal arcs</string>
+    <string name="pattern_celtic_interlace">Braided Lattice</string>
+    <string name="pattern_celtic_interlace_sub">Over-under woven diagonal straps</string>
+    <string name="pattern_kumiko_woodwork">Asanoha Kumiko</string>
+    <string name="pattern_kumiko_woodwork_sub">Japanese 6-fold hemp-leaf joinery</string>
+
+    <!-- patterns #33 - #48 -->
+    <string name="pattern_lorenz_attractor">Lorenz Butterfly</string>
+    <string name="pattern_lorenz_attractor_sub">Chaotic strange-attractor phase wings</string>
+    <string name="pattern_fourier_epicycles">Fourier Epicycles</string>
+    <string name="pattern_fourier_epicycles_sub">Harmonic phasor orbital ribbons</string>
+    <string name="pattern_kelvin_vortex">Vortex Street</string>
+    <string name="pattern_kelvin_vortex_sub">Kármán counter-rotating fluid eddies</string>
+    <string name="pattern_caustic_water">Lagoon Caustics</string>
+    <string name="pattern_caustic_water_sub">Refracted wave-envelope light cells</string>
+    <string name="pattern_maurer_rose">Maurer Rose</string>
+    <string name="pattern_maurer_rose_sub">Modular polar chord rose petals</string>
+    <string name="pattern_superformula_bloom">Gielis Morphogen</string>
+    <string name="pattern_superformula_bloom_sub">Generalized superformula star shells</string>
+    <string name="pattern_fermat_parabolic">Fermat Parastichy</string>
+    <string name="pattern_fermat_parabolic_sub">Counter-winding sunflower spirals</string>
+    <string name="pattern_metatron_polyhedra">Metatron Star</string>
+    <string name="pattern_metatron_polyhedra_sub">13-node sacred polyhedral lattice</string>
+    <string name="pattern_geodesic_dome">Geodesic Dome</string>
+    <string name="pattern_geodesic_dome_sub">Triangulated spherical truss facets</string>
+    <string name="pattern_perspective_colonnade">Infinite Atrium</string>
+    <string name="pattern_perspective_colonnade_sub">Vanishing-point coffered portals</string>
+    <string name="pattern_de_stijl_mondrian">Neoplastic Grid</string>
+    <string name="pattern_de_stijl_mondrian_sub">Golden-ratio orthogonal color slabs</string>
+    <string name="pattern_brutalist_ziggurat">Stepped Ziggurat</string>
+    <string name="pattern_brutalist_ziggurat_sub">Cantilevered shadow-bevel terraces</string>
+    <string name="pattern_hilbert_fractal">Hilbert Labyrinth</string>
+    <string name="pattern_hilbert_fractal_sub">Space-filling continuous fractal path</string>
+    <string name="pattern_dragon_curve">Heighway Dragon</string>
+    <string name="pattern_dragon_curve_sub">Self-similar 90° fold mosaic</string>
+    <string name="pattern_cairo_pentagonal">Cairo Pentagons</string>
+    <string name="pattern_cairo_pentagonal_sub">4-fold alternating street-tile mesh</string>
+    <string name="pattern_kagome_trihexagonal">Kagome Lattice</string>
+    <string name="pattern_kagome_trihexagonal_sub">Trihexagonal woven star basketry</string>
+
+    <!-- patterns #49 - #64 -->
+    <string name="pattern_thomas_attractor">Thomas Labyrinth</string>
+    <string name="pattern_thomas_attractor_sub">Cyclically symmetric 3D phase braids</string>
+    <string name="pattern_airy_wavefront">Airy Diffraction</string>
+    <string name="pattern_airy_wavefront_sub">Parabolic catastrophe wavefront fringes</string>
+    <string name="pattern_rossler_spiral">Rössler Vortex</string>
+    <string name="pattern_rossler_spiral_sub">Folded chaotic band &amp; saddle loops</string>
+    <string name="pattern_cassini_lemniscate">Cassini Ovals</string>
+    <string name="pattern_cassini_lemniscate_sub">Bipolar constant-product lemniscates</string>
+    <string name="pattern_deltoid_astroid">Astroid Cusps</string>
+    <string name="pattern_deltoid_astroid_sub">Hypocycloid star envelopes &amp; cusps</string>
+    <string name="pattern_zellij_khatam">Zellij Khatam</string>
+    <string name="pattern_zellij_khatam_sub">16-fold Moroccan star &amp; saft rosette</string>
+    <string name="pattern_vesica_lenses">Vesica Piscis</string>
+    <string name="pattern_vesica_lenses_sub">Overlapping sacred lens petal matrix</string>
+    <string name="pattern_triskelion_spirals">Triskelion Spirals</string>
+    <string name="pattern_triskelion_spirals_sub">Multi-arm counter-spun spiral blades</string>
+    <string name="pattern_escher_staircases">Escher Staircases</string>
+    <string name="pattern_escher_staircases_sub">Axonometric terraced flights &amp; risers</string>
+    <string name="pattern_kinetic_facade">Kinetic Facade</string>
+    <string name="pattern_kinetic_facade_sub">Twisted parametric brise-soleil fins</string>
+    <string name="pattern_pantheon_oculus">Pantheon Coffers</string>
+    <string name="pattern_pantheon_oculus_sub">Recessed radial dome caissons &amp; oculus</string>
+    <string name="pattern_suprematist_planes">Suprematist Planes</string>
+    <string name="pattern_suprematist_planes_sub">Cantilevered constructivist vectors</string>
+    <string name="pattern_sierpinski_prism">Sierpiński Prism</string>
+    <string name="pattern_sierpinski_prism_sub">Recursive triangular gasket facets</string>
+    <string name="pattern_archimedean_snub">Archimedean Snub</string>
+    <string name="pattern_archimedean_snub_sub">Chiral square-triangle semi-regular mesh</string>
+    <string name="pattern_ammann_quasicrystal">Ammann Quasicrystal</string>
+    <string name="pattern_ammann_quasicrystal_sub">8-fold silver-ratio rhombus &amp; square</string>
+    <string name="pattern_pythagoras_canopy">Pythagoras Fractal</string>
+    <string name="pattern_pythagoras_canopy_sub">Recursive right-triangle square canopy</string>
+
+    <!-- palettes screen & solid/gradient option -->
+    <string name="palettes_title">Colors</string>
+    <string name="palettes_subtitle">Choose fill style and select active color palettes for generation.</string>
+    <string name="label_color_shading">Color Fill Style</string>
     <string name="fill_mode_solid">Solid Colors</string>
     <string name="fill_mode_gradient">Gradients</string>
-    <string name="palette_mode_random">Randomized</string>
-    <string name="palette_mode_list">Palette List</string>
+    <string name="palette_mode_random">Randomize All</string>
+    <string name="palette_mode_list">Select Custom</string>
     <string name="random_palette_card_title">Random Color Harmony</string>
     <string name="random_palette_card_desc">Synthesizes balanced, high-contrast color harmonies for every new wallpaper.</string>
     <string name="btn_shuffle_colors">Shuffle Colors</string>
     <string name="btn_save_random_to_list">Save to My List</string>
+    <string name="btn_select_all">Select All</string>
+    <string name="btn_select_none">Select None</string>
+    <string name="btn_generate_random_harmony">Generate Random Harmony</string>
 
-    <string name="palette_list_hint">Select one or multiple palettes (%1$d active)</string>
+    <string name="palette_list_hint">Select custom palettes for generation (%1$d of %2$d active)</string>
     <string name="btn_add_palette">Add Palette</string>
+    <string name="btn_remove_palette">Remove</string>
     <string name="cd_delete_palette">Remove palette from list</string>
 
-    <!-- Create Palette Sheet -->
+    <!-- create palette sheet -->
     <string name="sheet_create_palette_title">New Palette</string>
     <string name="label_palette_name">Palette Name</string>
     <string name="placeholder_palette_name">e.g. Neon Dusk</string>
     <string name="label_palette_swatches">Colors (%1$d / 6)</string>
     <string name="btn_add_swatch">Add Color</string>
-    <string name="label_hex_code">HEX</string>
+    <string name="btn_remove_swatch">Remove Color</string>
+    <string name="cd_select_swatch">Select color %1$d</string>
+    <string name="label_hex_code">Hex</string>
     <string name="label_hue">Hue</string>
     <string name="label_saturation">Saturation</string>
     <string name="label_brightness">Brightness</string>
     <string name="btn_save_palette">Add to List</string>
     <string name="btn_cancel">Cancel</string>
 
-    <!-- Auto Interval Screen -->
+    <!-- auto interval screen -->
     <string name="auto_title">Automatic Interval</string>
     <string name="auto_subtitle">Runs reliably in the background even when the app is closed</string>
     <string name="auto_master_toggle">Auto-Change Wallpaper</string>
-    <string name="auto_next_in">Next change in %1$s</string>
-    <string name="auto_off_desc">Uses persistent OS background scheduling</string>
-    <string name="label_auto_target">Automatic Target</string>
+    <string name="auto_off_desc">Automatically updates your wallpaper at set intervals</string>
+    <string name="label_auto_target">Apply To</string>
     <string name="label_interval">Interval</string>
     <string name="btn_custom_interval">Custom…</string>
-    <string name="btn_run_now">Generate &amp; Set Now</string>
+    <string name="btn_custom_interval_active">Custom · %1$s</string>
     <string name="dialog_custom_interval_title">Custom Interval (Minutes)</string>
-    <string name="label_minutes_input">Minutes (1 – 10080)</string>
+    <string name="label_minutes_input">Minutes (1 – 10,080)</string>
+    <string name="error_interval_range">Enter 1 to 10,080 minutes</string>
     <string name="btn_confirm_interval">Save</string>
-    <string name="section_recent">Recent</string>
+    <string name="btn_auto_change_troubleshoot">Auto-change stopped working?</string>
 
-    <!-- Feedback -->
-    <string name="msg_wallpaper_applied">Applied to %1$s · %2$d%% Pitch Black</string>
+    <!-- auto-change troubleshooting help screen -->
+    <string name="auto_help_title">Auto-Change Help</string>
+    <string name="auto_help_why_title">Why Auto-Change Stops Working</string>
+    <string name="auto_help_why_body">Many phone brands include aggressive battery savers that force-stop background apps which stop auto-change when your screen is off. Setting Rimalux to Unrestricted lets auto-change run reliably with virtually zero battery drain.</string>
+
+    <string name="auto_help_vendor_section_title">Brand-Specific Instructions</string>
+    <string name="auto_help_vendor_detected_sub">Detected device: %1$s</string>
+    <string name="auto_help_not_your_device">Not your device?</string>
+    <string name="dialog_select_brand_title">Select Brand</string>
+    <string name="auto_help_badge_your_device">Your Phone</string>
+    <string name="auto_help_open_vendor_shortcut">Open %1$s Background Settings</string>
+    <string name="btn_open_app_battery_info">Open App Info</string>
+
+    <!-- Vendor names & OS skins -->
+    <string name="vendor_xiaomi_name">Xiaomi / POCO</string>
+    <string name="vendor_xiaomi_full">Xiaomi · Redmi · POCO</string>
+    <string name="vendor_xiaomi_skin">HyperOS &amp; MIUI</string>
+    <string name="vendor_xiaomi_step_1">Open App Info for Rimalux and enable Autostart (or Background autostart).</string>
+    <string name="vendor_xiaomi_step_2">Tap Battery saver (or Battery) and choose No restrictions instead of MIUI Battery saver.</string>
+    <string name="vendor_xiaomi_step_3">Open Recent Apps, press and hold the Rimalux card (or tap the menu), and tap the Lock padlock icon so clearing Recents does not kill timers.</string>
+
+    <string name="vendor_samsung_name">Samsung</string>
+    <string name="vendor_samsung_full">Samsung Galaxy</string>
+    <string name="vendor_samsung_skin">One UI</string>
+    <string name="vendor_samsung_step_1">Open App Info for Rimalux, tap Battery, and select Unrestricted.</string>
+    <string name="vendor_samsung_step_2">Open Settings → Battery → Background usage limits, and remove Rimalux from Sleeping apps and Deep sleeping apps.</string>
+    <string name="vendor_samsung_step_3">In Background usage limits, tap Never auto sleeping apps → + and add Rimalux.</string>
+
+    <string name="vendor_oppo_name">OPPO / OnePlus</string>
+    <string name="vendor_oppo_full">OPPO · Realme · OnePlus</string>
+    <string name="vendor_oppo_skin">ColorOS, Realme UI &amp; OxygenOS</string>
+    <string name="vendor_oppo_step_1">Open App Info for Rimalux → Battery usage (or Battery), and enable Allow background activity and Allow auto-launch.</string>
+    <string name="vendor_oppo_step_2">If an Optimize battery use option is shown, set Rimalux to Don’t optimize / Unrestricted.</string>
+    <string name="vendor_oppo_step_3">In Recent Apps, tap the three-dot menu above Rimalux and select Lock to prevent background termination.</string>
+
+    <string name="vendor_vivo_name">Vivo / iQOO</string>
+    <string name="vendor_vivo_full">Vivo · iQOO</string>
+    <string name="vendor_vivo_skin">Funtouch OS &amp; OriginOS</string>
+    <string name="vendor_vivo_step_1">Open App Info for Rimalux → Battery, and select Unrestricted (or enable High background power consumption).</string>
+    <string name="vendor_vivo_step_2">Go to Settings → Apps → Autostart (or iManager → App manager → Autostart manager) and toggle Rimalux on.</string>
+    <string name="vendor_vivo_step_3">In Recent Apps, tap the arrow next to Rimalux and select Lockdown / Lock.</string>
+
+    <string name="vendor_huawei_name">Huawei / Honor</string>
+    <string name="vendor_huawei_full">Huawei · Honor</string>
+    <string name="vendor_huawei_skin">EMUI &amp; MagicOS</string>
+    <string name="vendor_huawei_step_1">Open Settings → Battery → App launch, find Rimalux, and turn Manage automatically OFF.</string>
+    <string name="vendor_huawei_step_2">In the manual popup that appears, keep Auto-launch, Secondary launch, and Run in background all enabled, then tap OK.</string>
+    <string name="vendor_huawei_step_3">In Recent Apps, pull down on the Rimalux card to display the padlock icon.</string>
+
+    <string name="vendor_asus_name">ASUS</string>
+    <string name="vendor_asus_full">ASUS Zenfone &amp; ROG</string>
+    <string name="vendor_asus_skin">ZenUI &amp; ROG UI</string>
+    <string name="vendor_asus_step_1">Open Mobile Manager → PowerMaster → Auto-start Manager and switch Rimalux to Allow.</string>
+    <string name="vendor_asus_step_2">Open App Info for Rimalux → Battery and select Unrestricted.</string>
+    <string name="vendor_asus_step_3">If System Mode / Ultra-saving mode is enabled in Armoury Crate or Battery, exclude Rimalux from background cleanup.</string>
+
+    <string name="vendor_stock_name">Pixel / Standard</string>
+    <string name="vendor_stock_full">Google Pixel · Motorola · Nothing · Sony</string>
+    <string name="vendor_stock_skin">Standard Android</string>
+    <string name="vendor_stock_step_1">Open App Info for Rimalux → App battery usage.</string>
+    <string name="vendor_stock_step_2">Enable Allow background usage, then tap the text row Allow background usage (not just the switch) and choose Unrestricted.</string>
+    <string name="vendor_stock_step_3">Avoid using Force stop in App Info, as Android cancels all scheduled alarms for force-stopped apps until reopened.</string>
+
+    <string name="auto_help_tip_title">Quick Recovery Tip</string>
+    <string name="auto_help_tip_body">If auto-change ever stops, simply opening Rimalux once will automatically resume wallpaper auto-change.</string>
+
+    <!-- feedback -->
+    <string name="msg_wallpaper_applied">Applied to %1$s · %2$d%% true black</string>
     <string name="msg_wallpaper_error">Could not set wallpaper: %1$s</string>
+    <string name="msg_wallpaper_saved">Saved to Pictures · %1$d×%2$d PNG</string>
+    <string name="msg_wallpaper_save_error">Could not save wallpaper: %1$s</string>
+    <string name="msg_wallpaper_share_error">Could not share wallpaper: %1$s</string>
+    <string name="msg_storage_permission_denied">Storage permission is required to save wallpapers</string>
     <string name="msg_palette_saved">Added \"%1$s\" to palette list</string>
     <string name="msg_schedule_updated">Auto-change every %1$s (%2$s)</string>
+    <string name="msg_vendor_fallback_app_info">Opened App Info — tap Battery to set Unrestricted</string>
+    <string name="msg_settings_open_error">Could not open system settings on this device</string>
+
+    <!-- Enjoying Rimalux & Send Thanks (Voluntary Tip Jar) -->
+    <string name="btn_like_the_app">Enjoying Rimalux?</string>
+    <string name="dialog_like_app_title">Like Rimalux?</string>
+    <string name="dialog_like_app_sub">Rimalux is 100% free with no ads or tracking. If it made your setup look nice, leaving a review or sending a tip is always appreciated.</string>
+    <string name="btn_rate_app">Rate the App</string>
+    <string name="btn_send_thanks">Send a Thanks</string>
+
+    <string name="dialog_send_thanks_title">Send a Thanks</string>
+    <string name="dialog_send_thanks_sub">No perks, no unlocked features, and no roadmap promises—just a simple tip jar if you feel like dropping a quick thank you.</string>
+    <string name="tip_1_usd">$1 USD</string>
+    <string name="tip_3_usd">$3 USD</string>
+    <string name="tip_5_usd">$5 USD</string>
+    <string name="tip_10_usd">$10 USD</string>
+    <string name="tip_20_usd">$20 USD</string>
+    <string name="msg_rating_launched">Opening Play Store for rating…</string>
+    <string name="msg_thanks_sent">Thank you so much for sending a %1$s thanks! Your support means the world.</string>
 </resources>

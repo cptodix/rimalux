@@ -3,7 +3,8 @@ package com.example.scheduler
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.engine.WallpaperApplyResult
+import com.example.data.WallpaperPreferencesRepository
+import com.example.platform.WallpaperApplyResult
 
 /**
  * Persistent OS-backed background worker (JobScheduler + WorkManager SQLite store)
@@ -19,12 +20,23 @@ class WallpaperRotationWorker(
         val result = WallpaperScheduler.executeAutoRotationCycle(
             context = applicationContext,
             wasScheduled = true,
-            force = false
+            force = false,
+            fromRunningWorker = true
         )
         return when (result) {
             is WallpaperApplyResult.Success -> Result.success()
             is WallpaperApplyResult.Error -> {
-                if (runAttemptCount < 2) Result.retry() else Result.success()
+                val isStillEnabled = runCatching {
+                    WallpaperPreferencesRepository(applicationContext)
+                        .getSnapshot()
+                        .config
+                        .autoRotateEnabled
+                }.getOrDefault(false)
+                if (isStillEnabled && runAttemptCount < 2) {
+                    Result.retry()
+                } else {
+                    Result.success()
+                }
             }
         }
     }

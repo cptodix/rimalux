@@ -11,26 +11,49 @@ import kotlinx.coroutines.launch
 
 class BootCompletedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
-        val action = intent?.action ?: return
-        if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_MY_PACKAGE_REPLACED) {
+        if (!isSupportedAction(intent?.action)) {
             return
         }
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                val appContext = context.applicationContext
-                val repository = WallpaperPreferencesRepository(appContext)
-                val snapshot = repository.getSnapshot()
-                if (snapshot.config.autoRotateEnabled) {
-                    val nextMillis = WallpaperScheduler.scheduleNext(
-                        appContext,
-                        snapshot.config.intervalMinutes
-                    )
-                    repository.updateConfig { it.copy(nextRunEpochMillis = nextMillis) }
-                }
+                handleBootOrUpdateIntent(context, intent)
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
+    }
+
+    internal suspend fun handleBootOrUpdateIntent(context: Context, intent: Intent?) {
+        if (!isSupportedAction(intent?.action)) {
+            return
+        }
+        val appContext = context.applicationContext
+        val repository = WallpaperPreferencesRepository(appContext)
+        val snapshot = repository.getSnapshot()
+        if (snapshot.config.autoRotateEnabled) {
+            val nextMillis = WallpaperScheduler.ensureScheduled(
+                context = appContext,
+                intervalMinutes = snapshot.config.intervalMinutes,
+                desiredNextRunMillis = snapshot.config.nextRunEpochMillis
+            )
+            if (nextMillis != snapshot.config.nextRunEpochMillis) {
+                repository.updateConfig { it.copy(nextRunEpochMillis = nextMillis) }
+            }
+        }
+    }
+
+    private fun isSupportedAction(action: String?): Boolean {
+        if (action == null) return false
+        return action in SUPPORTED_ACTIONS
+    }
+
+    companion object {
+        private val SUPPORTED_ACTIONS = setOf(
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            "android.intent.action.QUICKBOOT_POWERON",
+            "com.htc.intent.action.QUICKBOOT_POWERON"
+        )
     }
 }

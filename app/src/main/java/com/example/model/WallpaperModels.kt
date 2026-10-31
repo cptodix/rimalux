@@ -1,55 +1,32 @@
 package com.example.model
 
 import android.app.WallpaperManager
-import android.graphics.Color as AndroidColor
 import com.example.R
+import com.example.engine.CoreGenerationSpec
+import com.example.engine.DeepBlackRatioEngine
+import com.example.engine.WallpaperGeneratorEngine
 import kotlin.random.Random
 
-enum class ArtStyle(
-    val id: String,
-    val titleRes: Int,
-    val subtitleRes: Int
-) {
-    SILK_RIBBONS("silk_ribbons", R.string.style_silk_ribbons, R.string.style_silk_ribbons_sub),
-    CRYSTAL_VORONOI("crystal_voronoi", R.string.style_crystal_voronoi, R.string.style_crystal_voronoi_sub),
-    SACRED_MANDALA("sacred_mandala", R.string.style_sacred_mandala, R.string.style_sacred_mandala_sub),
-    TOPO_CONTOURS("topo_contours", R.string.style_topo_contours, R.string.style_topo_contours_sub),
-    GUILLOCHE_ROSETTE("guilloche_rosette", R.string.style_guilloche_rosette, R.string.style_guilloche_rosette_sub),
-    PENROSE_QUASICRYSTAL("penrose_quasicrystal", R.string.style_penrose_quasicrystal, R.string.style_penrose_quasicrystal_sub),
-    ISOMETRIC_MONUMENT("isometric_monument", R.string.style_isometric_monument, R.string.style_isometric_monument_sub),
-    ORIGAMI_MIURA("origami_miura", R.string.style_origami_miura, R.string.style_origami_miura_sub),
-    FIBONACCI_LOTUS("fibonacci_lotus", R.string.style_fibonacci_lotus, R.string.style_fibonacci_lotus_sub),
-    ART_DECO_SUNBURST("art_deco_sunburst", R.string.style_art_deco_sunburst, R.string.style_art_deco_sunburst_sub),
-    GIRIH_STARWORK("girih_starwork", R.string.style_girih_starwork, R.string.style_girih_starwork_sub),
-    OP_ART_GRAVITY("op_art_gravity", R.string.style_op_art_gravity, R.string.style_op_art_gravity_sub),
-    HARMONIC_CARDIOID("harmonic_cardioid", R.string.style_harmonic_cardioid, R.string.style_harmonic_cardioid_sub),
-    BAUHAUS_CONSTRUCT("bauhaus_construct", R.string.style_bauhaus_construct, R.string.style_bauhaus_construct_sub),
-    FRACTAL_LATTICE("fractal_lattice", R.string.style_fractal_lattice, R.string.style_fractal_lattice_sub),
-    HORIZON_WAVES("horizon_waves", R.string.style_horizon_waves, R.string.style_horizon_waves_sub);
+/**
+ * Re-exports pure mathematical core types from `com.example.engine` for convenient access
+ * across the Android application layer while keeping Android-only app state (`WallpaperTarget`,
+ * `MockupOverlayMode`, `GeneratorConfig`, `GeneratedHistoryItem`, `IntervalFormatter`) separated.
+ */
+typealias PatternCategory = com.example.engine.PatternCategory
+typealias ArtPattern = com.example.engine.ArtPattern
+typealias ColorFillMode = com.example.engine.ColorFillMode
+typealias PaletteMode = com.example.engine.PaletteMode
+typealias PitchBlackMode = com.example.engine.PitchBlackMode
+typealias ColorPalette = com.example.engine.ColorPalette
 
-    companion object {
-        fun fromId(id: String): ArtStyle? = entries.find { it.id == id }
-    }
+object StarterPalettes {
+    val defaults: List<ColorPalette>
+        get() = com.example.engine.StarterPalettes.defaults
 }
 
-enum class ColorFillMode(val id: String) {
-    SOLID("solid"),
-    GRADIENT("gradient");
-
-    companion object {
-        fun fromId(id: String): ColorFillMode =
-            entries.find { it.id == id } ?: GRADIENT
-    }
-}
-
-enum class PaletteMode(val id: String) {
-    RANDOMIZED("randomized"),
-    PALETTE_LIST("palette_list");
-
-    companion object {
-        fun fromId(id: String): PaletteMode =
-            entries.find { it.id == id } ?: RANDOMIZED
-    }
+object RandomPaletteGenerator {
+    fun generate(seed: Long): List<Long> =
+        com.example.engine.RandomPaletteGenerator.generate(seed)
 }
 
 enum class WallpaperTarget(
@@ -59,7 +36,12 @@ enum class WallpaperTarget(
 ) {
     HOME("home", WallpaperManager.FLAG_SYSTEM, R.string.target_home),
     LOCK("lock", WallpaperManager.FLAG_LOCK, R.string.target_lock),
-    BOTH("both", WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK, R.string.target_both);
+    BOTH("both", WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK, R.string.target_both),
+    BOTH_SEPARATE(
+        "both_separate",
+        WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK,
+        R.string.target_both_separate
+    );
 
     companion object {
         fun fromId(id: String): WallpaperTarget =
@@ -73,100 +55,60 @@ enum class MockupOverlayMode {
     HOME_GRID
 }
 
-data class ColorPalette(
-    val id: String,
-    val name: String,
-    val colors: List<Long>
-)
-
-object StarterPalettes {
-    val defaults: List<ColorPalette> = listOf(
-        ColorPalette(
-            id = "obsidian_aurora",
-            name = "Aurora Silk",
-            colors = listOf(0xFF00F5D4, 0xFF00BBF9, 0xFF7B2CBF, 0xFFF15BB5, 0xFFFFD166)
-        ),
-        ColorPalette(
-            id = "imperial_gold",
-            name = "Imperial Gold",
-            colors = listOf(0xFFFFD166, 0xFFF4A261, 0xFFE76F51, 0xFF2A9D8F, 0xFFE9C46A)
-        ),
-        ColorPalette(
-            id = "bauhaus_studio",
-            name = "Bauhaus Modern",
-            colors = listOf(0xFFE63946, 0xFFFFB703, 0xFF219EBC, 0xFFF1FAEE)
-        ),
-        ColorPalette(
-            id = "nordic_glacier",
-            name = "Nordic Glacier",
-            colors = listOf(0xFFE0FBFC, 0xFF98C1D9, 0xFF3D5A80, 0xFF48CAE4)
-        ),
-        ColorPalette(
-            id = "titanium_mono",
-            name = "Silver Silk",
-            colors = listOf(0xFFFFFFFF, 0xFFD4D4D8, 0xFF9CA3AF, 0xFF52525B)
-        )
-    )
-}
-
-object RandomPaletteGenerator {
-    /**
-     * Synthesizes harmonious, curated designer color palettes using HSV color-theory rules.
-     */
-    fun generate(seed: Long): List<Long> {
-        val rng = Random(seed)
-        val swatchCount = 4 + rng.nextInt(2)
-        val baseHue = rng.nextFloat() * 360f
-        val harmonyType = rng.nextInt(4)
-
-        val colors = ArrayList<Long>(swatchCount)
-        for (i in 0 until swatchCount) {
-            val hue = when (harmonyType) {
-                0 -> (baseHue + i * 26f) % 360f
-                1 -> {
-                    val offsets = floatArrayOf(0f, 24f, 165f, 195f, 340f)
-                    (baseHue + offsets[i % offsets.size]) % 360f
-                }
-                2 -> (baseHue + (i % 3) * 120f + (i / 3) * 22f) % 360f
-                else -> {
-                    if (i < swatchCount - 1) (baseHue + i * 20f) % 360f
-                    else (baseHue + 180f) % 360f
-                }
-            }
-            val saturation = (0.55f + rng.nextFloat() * 0.36f).coerceIn(0.45f, 0.94f)
-            val value = (0.80f + rng.nextFloat() * 0.20f).coerceIn(0.76f, 1.0f)
-            val rgbInt = AndroidColor.HSVToColor(floatArrayOf(hue, saturation, value))
-            colors.add(0xFF000000L or (rgbInt.toLong() and 0xFFFFFFL))
-        }
-        return colors
-    }
-}
-
 data class GeneratorConfig(
-    val stylesRandomized: Boolean = true,
-    val selectedStyles: Set<ArtStyle> = setOf(
-        ArtStyle.SILK_RIBBONS,
-        ArtStyle.CRYSTAL_VORONOI,
-        ArtStyle.SACRED_MANDALA,
-        ArtStyle.PENROSE_QUASICRYSTAL
-    ),
+    val patternsRandomized: Boolean = true,
+    val selectedPatterns: Set<ArtPattern> = CoreGenerationSpec.DEFAULT_SELECTED_PATTERNS,
     val colorFillMode: ColorFillMode = ColorFillMode.GRADIENT,
     val paletteMode: PaletteMode = PaletteMode.RANDOMIZED,
     val selectedPaletteIds: Set<String> = setOf("obsidian_aurora"),
-    val pitchBlackRatio: Float = 0.65f,
-    val intricacy: Float = 0.60f,
-    val autoApplyOnGenerate: Boolean = true,
+    val pitchBlackMode: PitchBlackMode = PitchBlackMode.SINGLE,
+    val pitchBlackRatio: Float = DEFAULT_PITCH_BLACK_RATIO,
+    val pitchBlackRangeMin: Float = 0.75f,
+    val pitchBlackRangeMax: Float = 0.90f,
     val manualTarget: WallpaperTarget = WallpaperTarget.BOTH,
     val autoRotateEnabled: Boolean = false,
     val intervalMinutes: Int = 60,
     val autoTarget: WallpaperTarget = WallpaperTarget.BOTH,
     val nextRunEpochMillis: Long = 0L
-)
+) {
+    fun toCoreSpec(): CoreGenerationSpec = CoreGenerationSpec(
+        patternsRandomized = patternsRandomized,
+        selectedPatterns = selectedPatterns,
+        colorFillMode = colorFillMode,
+        paletteMode = paletteMode,
+        selectedPaletteIds = selectedPaletteIds,
+        pitchBlackMode = pitchBlackMode,
+        pitchBlackRatio = pitchBlackRatio,
+        pitchBlackRangeMin = pitchBlackRangeMin,
+        pitchBlackRangeMax = pitchBlackRangeMax
+    )
+
+    fun resolvePitchBlackRatio(rng: Random): Float =
+        DeepBlackRatioEngine.resolveTargetBlackRatio(
+            mode = pitchBlackMode,
+            singleRatio = pitchBlackRatio,
+            rangeMin = pitchBlackRangeMin,
+            rangeMax = pitchBlackRangeMax,
+            rng = rng
+        )
+
+    companion object {
+        const val DEFAULT_PITCH_BLACK_RATIO: Float = DeepBlackRatioEngine.DEFAULT_PITCH_BLACK_RATIO
+        const val MIN_RANDOM_INTRICACY: Float = WallpaperGeneratorEngine.MIN_RANDOM_INTRICACY
+        const val MAX_RANDOM_INTRICACY: Float = WallpaperGeneratorEngine.MAX_RANDOM_INTRICACY
+
+        fun sampleIntricacy(rng: Random): Float =
+            WallpaperGeneratorEngine.sampleIntricacy(rng)
+
+        fun sampleIntricacyForSeed(seed: Long): Float =
+            WallpaperGeneratorEngine.sampleIntricacyForSeed(seed)
+    }
+}
 
 data class GeneratedHistoryItem(
     val id: String,
     val seed: Long,
-    val style: ArtStyle,
+    val pattern: ArtPattern,
     val colorFillMode: ColorFillMode,
     val paletteColors: List<Long>,
     val pitchBlackRatio: Float,
@@ -187,15 +129,23 @@ object IntervalFormatter {
         }
     }
 
-    fun formatCountdown(totalSeconds: Long): String {
-        val clamped = totalSeconds.coerceAtLeast(0L)
-        val hours = clamped / 3600
-        val minutes = (clamped % 3600) / 60
-        val seconds = clamped % 60
-        return if (hours > 0) {
-            "%dh %02dm".format(hours, minutes)
-        } else {
-            "%02dm %02ds".format(minutes, seconds)
+    fun formatMinutesDescriptive(minutes: Int): String {
+        return when (minutes) {
+            1 -> "1 Minute"
+            5 -> "5 Minutes"
+            15 -> "15 Minutes"
+            30 -> "30 Minutes"
+            60 -> "1 Hour"
+            180 -> "3 Hours"
+            360 -> "6 Hours"
+            720 -> "12 Hours"
+            1440 -> "1 Day"
+            else -> when {
+                minutes < 60 -> "$minutes Minutes"
+                minutes % 1440 == 0 -> "${minutes / 1440} Days"
+                minutes % 60 == 0 -> "${minutes / 60} Hours"
+                else -> "${minutes / 60}h ${minutes % 60}m"
+            }
         }
     }
 }

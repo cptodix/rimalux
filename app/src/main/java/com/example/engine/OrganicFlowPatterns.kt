@@ -12,7 +12,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-internal object OrganicFlowStyles {
+internal object OrganicFlowPatterns {
 
     private const val TWO_PI = (2.0 * PI).toFloat()
     private const val GOLDEN_ANGLE = 2.3999631f

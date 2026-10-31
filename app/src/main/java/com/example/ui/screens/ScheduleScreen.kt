@@ -2,38 +2,38 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -47,204 +47,163 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
-import com.example.engine.MathPatternGenerator
-import com.example.model.GeneratedHistoryItem
+import com.example.model.GeneratorConfig
 import com.example.model.IntervalFormatter
 import com.example.model.WallpaperTarget
-import com.example.ui.VectraUiState
-import com.example.ui.components.MiniVectorThumbnail
-import com.example.ui.components.TargetSegmentedBar
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ScheduleScreen(
-    uiState: VectraUiState,
+fun AutoChangeSection(
+    config: GeneratorConfig,
     onToggleAutoRotate: (Boolean) -> Unit,
-    onSelectIntervalMinutes: (Int) -> Unit,
-    onOpenCustomIntervalDialog: () -> Unit,
-    onTriggerRotationNow: () -> Unit,
-    onAutoTargetChange: (WallpaperTarget) -> Unit,
-    onRestoreHistoryItem: (GeneratedHistoryItem) -> Unit,
-    onBackToHome: () -> Unit,
+    onOpenAutoTargetDialog: () -> Unit,
+    onOpenIntervalDialog: () -> Unit,
+    onOpenAutoChangeHelp: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    BackHandler(onBack = onBackToHome)
+    val subSectionAlpha = if (config.autoRotateEnabled) 1f else 0.78f
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("schedule_screen_list"),
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Persistent Background Hero Switch Card
-        item(key = "auto_hero_card") {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+            // Master Toggle Row
             Surface(
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                onClick = { onToggleAutoRotate(!config.autoRotateEnabled) },
+                color = Color.Transparent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 68.dp)
+                    .minimumInteractiveComponentSize()
             ) {
-                Column {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(116.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.img_automation_banner),
-                            contentDescription = stringResource(R.string.auto_title),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color.Black.copy(alpha = 0.25f), Color.Black.copy(alpha = 0.88f))
-                                    )
-                                )
-                        )
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.auto_title),
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = Color.White
-                            )
-                            Text(
-                                text = stringResource(R.string.auto_subtitle),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { onToggleAutoRotate(!uiState.config.autoRotateEnabled) },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = stringResource(R.string.auto_master_toggle),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (uiState.config.autoRotateEnabled) {
-                                        stringResource(
-                                            R.string.auto_next_in,
-                                            IntervalFormatter.formatCountdown(uiState.countdownSeconds)
-                                        )
-                                    } else {
-                                        stringResource(R.string.auto_off_desc)
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (uiState.config.autoRotateEnabled) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Switch(
-                                checked = uiState.config.autoRotateEnabled,
-                                onCheckedChange = onToggleAutoRotate,
-                                modifier = Modifier.testTag("switch_auto_rotate")
-                            )
-                        }
-
-                        Button(
-                            onClick = onTriggerRotationNow,
-                            enabled = !uiState.isApplyingWallpaper,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .minimumInteractiveComponentSize()
-                                .testTag("btn_trigger_rotation_now")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Bolt,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (uiState.isApplyingWallpaper) {
-                                    stringResource(R.string.btn_applying)
-                                } else {
-                                    stringResource(R.string.btn_run_now)
-                                }
-                            )
-                        }
+                        Text(
+                            text = stringResource(R.string.auto_master_toggle),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.auto_off_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                }
-            }
-        }
 
-        // Dedicated Automatic Target Selector (Wallpaper / Lock Screen / Both)
-        item(key = "auto_target_card") {
-            Surface(
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.label_auto_target),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    TargetSegmentedBar(
-                        selectedTarget = uiState.config.autoTarget,
-                        onTargetSelected = onAutoTargetChange,
-                        tagPrefix = "auto_target"
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Switch(
+                        checked = config.autoRotateEnabled,
+                        onCheckedChange = onToggleAutoRotate,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("switch_auto_rotate")
                     )
                 }
             }
-        }
 
-        // Interval Picker Card
-        item(key = "interval_card") {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+            )
+
+            // Auto-Change To Row (opens popup dialog)
             Surface(
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
+                onClick = onOpenAutoTargetDialog,
+                color = Color.Transparent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 64.dp)
+                    .minimumInteractiveComponentSize()
+                    .graphicsLayer { alpha = subSectionAlpha }
+                    .testTag("pill_open_auto_target")
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.label_auto_target),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(config.autoTarget.labelRes),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+            )
+
+            // Interval Row (opens popup dialog)
+            Surface(
+                onClick = onOpenIntervalDialog,
+                color = Color.Transparent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 64.dp)
+                    .minimumInteractiveComponentSize()
+                    .graphicsLayer { alpha = subSectionAlpha }
+                    .testTag("pill_open_interval")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.label_interval),
@@ -252,160 +211,455 @@ fun ScheduleScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = IntervalFormatter.formatMinutesShort(uiState.config.intervalMinutes),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
+                            text = IntervalFormatter.formatMinutesShort(config.intervalMinutes),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        IntervalFormatter.presetMinutes.forEach { mins ->
-                            val isSelected = uiState.config.intervalMinutes == mins
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { onSelectIntervalMinutes(mins) },
-                                leadingIcon = if (isSelected) {
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(FilterChipDefaults.IconSize)
-                                        )
-                                    }
-                                } else null,
-                                label = {
-                                    Text(
-                                        text = IntervalFormatter.formatMinutesShort(mins),
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                },
-                                modifier = Modifier
-                                    .minimumInteractiveComponentSize()
-                                    .testTag("chip_interval_$mins")
-                            )
-                        }
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                        val isCustom = uiState.config.intervalMinutes !in IntervalFormatter.presetMinutes
-                        FilterChip(
-                            selected = isCustom,
-                            onClick = onOpenCustomIntervalDialog,
-                            label = {
-                                Text(
-                                    text = if (isCustom) {
-                                        "${uiState.config.intervalMinutes}m"
-                                    } else {
-                                        stringResource(R.string.btn_custom_interval)
-                                    },
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            },
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .testTag("btn_custom_interval")
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
+            }
             }
         }
 
-        // Compact Recent Thumbnails Strip
-        if (uiState.history.isNotEmpty()) {
-            item(key = "recent_strip") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = stringResource(R.string.section_recent),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 2.dp)
-                    ) {
-                        items(
-                            items = uiState.history,
-                            key = { it.id }
-                        ) { item ->
-                            val thumbScene = remember(item.seed, item.style, item.intricacy) {
-                                MathPatternGenerator.generate(
-                                    seed = item.seed,
-                                    style = item.style,
-                                    intricacy = item.intricacy,
-                                    aspectRatio = 1.45f
-                                )
-                            }
-                            MiniVectorThumbnail(
-                                scene = thumbScene,
-                                paletteColors = item.paletteColors,
-                                pitchBlackRatio = item.pitchBlackRatio,
-                                colorFillMode = item.colorFillMode,
-                                modifier = Modifier
-                                    .size(width = 76.dp, height = 110.dp)
-                                    .clickable { onRestoreHistoryItem(item) }
-                                    .testTag("history_card_${item.id}")
-                            )
-                        }
-                    }
-                }
+        // Low-emphasis M3 clickable pill under Interval (obviously interactive via outline + chevron, calm for last-resort help)
+        Surface(
+            onClick = onOpenAutoChangeHelp,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+            ),
+            modifier = Modifier
+                .align(Alignment.Start)
+                .minimumInteractiveComponentSize()
+                .testTag("btn_auto_change_help")
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 14.dp, end = 10.dp, top = 9.dp, bottom = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.btn_auto_change_troubleshoot),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
 }
 
 @Composable
-fun CustomIntervalDialog(
-    initialMinutes: Int,
-    onConfirm: (Int) -> Unit,
-    onDismiss: () -> Unit
+private fun RimaluxModalDialog(
+    dialogTestTag: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    var minutesText by remember { mutableStateOf(initialMinutes.toString()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = stringResource(R.string.dialog_custom_interval_title),
-                style = MaterialTheme.typography.titleLarge
-            )
-        },
-        text = {
-            OutlinedTextField(
-                value = minutesText,
-                onValueChange = { input ->
-                    minutesText = input.filter { it.isDigit() }.take(5)
-                },
-                label = { Text(stringResource(R.string.label_minutes_input)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.72f))
+            .pointerInput(onDismiss) {
+                detectTapGestures(onTap = { onDismiss() })
+            }
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 0.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            ),
+            modifier = Modifier
+                .widthIn(max = 360.dp)
+                .fillMaxWidth()
+                .testTag(dialogTestTag)
+        ) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("input_custom_interval_minutes")
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                content = content
             )
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val parsed = minutesText.toIntOrNull()?.coerceIn(1, 10080) ?: 60
-                    onConfirm(parsed)
-                },
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .testTag("btn_confirm_custom_interval")
-            ) {
-                Text(stringResource(R.string.btn_confirm_interval))
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.minimumInteractiveComponentSize()
-            ) {
-                Text(stringResource(R.string.btn_cancel))
+        }
+    }
+}
+
+@Composable
+fun AutoTargetDialog(
+    selectedTarget: WallpaperTarget,
+    onSelectTarget: (WallpaperTarget) -> Unit,
+    onDismiss: () -> Unit
+) {
+    RimaluxModalDialog(
+        dialogTestTag = "dialog_auto_target",
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = stringResource(R.string.label_auto_target),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            WallpaperTarget.entries.forEach { target ->
+                val isSelected = selectedTarget == target
+                Surface(
+                    selected = isSelected,
+                    onClick = { onSelectTarget(target) },
+                    shape = MaterialTheme.shapes.medium,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    },
+                    border = if (isSelected) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
+                    } else {
+                        null
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .minimumInteractiveComponentSize()
+                        .testTag("auto_target_${target.id}")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(target.labelRes),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
-    )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = onDismiss,
+                shape = CircleShape,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .minimumInteractiveComponentSize()
+                    .testTag("btn_cancel_auto_target")
+            ) {
+                Text(
+                    text = stringResource(R.string.btn_cancel),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun IntervalPickerDialog(
+    selectedMinutes: Int,
+    isCustomEntryMode: Boolean = false,
+    onSelectMinutes: (Int) -> Unit,
+    onOpenCustomInterval: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val presetRows = remember { IntervalFormatter.presetMinutes.chunked(3) }
+    val isCustomActive = selectedMinutes !in IntervalFormatter.presetMinutes
+    var minutesText by remember(selectedMinutes, isCustomEntryMode) {
+        mutableStateOf(selectedMinutes.toString())
+    }
+    val parsedMinutes = minutesText.toIntOrNull()
+    val isValid = parsedMinutes != null && parsedMinutes in 1..10080
+
+    RimaluxModalDialog(
+        dialogTestTag = if (isCustomEntryMode) "dialog_custom_interval" else "dialog_interval_picker",
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = stringResource(
+                if (isCustomEntryMode) {
+                    R.string.dialog_custom_interval_title
+                } else {
+                    R.string.label_interval
+                }
+            ),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        if (isCustomEntryMode) {
+            val interactionSource = remember { MutableInteractionSource() }
+            val isFocused by interactionSource.collectIsFocusedAsState()
+            val borderColor = when {
+                !isValid -> MaterialTheme.colorScheme.error
+                isFocused -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.outline
+            }
+            val borderWidth = if (!isValid || isFocused) 2.dp else 1.dp
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.label_minutes_input),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                BasicTextField(
+                    value = minutesText,
+                    onValueChange = { input ->
+                        minutesText = input.filter { it.isDigit() }.take(5)
+                    },
+                    singleLine = true,
+                    interactionSource = interactionSource,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    cursorBrush = SolidColor(
+                        if (isValid) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        }
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_custom_interval_minutes"),
+                    decorationBox = { innerTextField ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 52.dp)
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                .border(borderWidth, borderColor, MaterialTheme.shapes.medium)
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            innerTextField()
+                        }
+                    }
+                )
+                if (!isValid) {
+                    Text(
+                        text = stringResource(R.string.error_interval_range),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                IntervalFormatter.presetMinutes.forEach { mins ->
+                    val isSelected = selectedMinutes == mins
+                    Surface(
+                        selected = isSelected,
+                        onClick = { onSelectMinutes(mins) },
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        },
+                        border = if (isSelected) {
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
+                        } else {
+                            null
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .minimumInteractiveComponentSize()
+                            .testTag("chip_interval_$mins")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = IntervalFormatter.formatMinutesDescriptive(mins),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Surface(
+                    selected = isCustomActive,
+                    onClick = onOpenCustomInterval,
+                    shape = MaterialTheme.shapes.medium,
+                    color = if (isCustomActive) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    },
+                    border = if (isCustomActive) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
+                    } else {
+                        null
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .minimumInteractiveComponentSize()
+                        .testTag("btn_custom_interval")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isCustomActive) {
+                                stringResource(
+                                    R.string.btn_custom_interval_active,
+                                    IntervalFormatter.formatMinutesShort(selectedMinutes)
+                                )
+                            } else {
+                                stringResource(R.string.btn_custom_interval)
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isCustomActive) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                        Icon(
+                            imageVector = if (isCustomActive) {
+                                Icons.Rounded.Check
+                            } else {
+                                Icons.AutoMirrored.Rounded.KeyboardArrowRight
+                            },
+                            contentDescription = null,
+                            tint = if (isCustomActive) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(
+                onClick = onDismiss,
+                shape = CircleShape,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .minimumInteractiveComponentSize()
+                    .testTag("btn_cancel_interval_picker")
+            ) {
+                Text(
+                    text = stringResource(R.string.btn_cancel),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+
+            if (isCustomEntryMode) {
+                Button(
+                    onClick = {
+                        val value = parsedMinutes?.coerceIn(1, 10080) ?: return@Button
+                        onSelectMinutes(value)
+                    },
+                    enabled = isValid,
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .minimumInteractiveComponentSize()
+                        .testTag("btn_confirm_custom_interval")
+                ) {
+                    Text(
+                        text = stringResource(R.string.btn_confirm_interval),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+        }
+    }
 }
