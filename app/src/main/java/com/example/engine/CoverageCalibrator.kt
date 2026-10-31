@@ -3,16 +3,19 @@ package com.example.engine
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.random.Random
 
 /**
  * Calibrates primitive visibility thresholds against an exact 2D viewport coverage mask
- * on [0f, 1f] x [0f, aspect] so every generated wallpaper—across all 64 patterns, any seed,
- * and both manual & automatic runs—achieves the exact requested #000000 True Black Ratio.
+ * on [0f, 1f] x [0f, aspect] so every generated wallpaper—across all 80 patterns, any seed,
+ * Normal or Center Weighted layout, and both manual & automatic runs—achieves the exact
+ * requested #000000 True Black Ratio.
  */
 internal object CoverageCalibrator {
 
@@ -22,7 +25,8 @@ internal object CoverageCalibrator {
         primaryCells: List<DraftCell>,
         rng: Random,
         field: SculptField,
-        aspect: Float
+        aspect: Float,
+        patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL
     ): List<VectorPrimitive> {
         val gridW = GRID_W
         val gridH = (gridW * aspect).roundToInt().coerceIn(80, 640)
@@ -31,11 +35,40 @@ internal object CoverageCalibrator {
         val cellSize = 1f / gridW.toFloat()
 
         // Materialize each primary cell once to preserve deterministic RNG state
-        val builtPrimary: List<List<VectorPrimitive>> = primaryCells.map { it.build(0.5f) }
+        var builtPrimary: List<List<VectorPrimitive>> = primaryCells.map { it.build(0.5f) }
+
+        if (patternWeightMode == PatternWeightMode.CENTER_WEIGHTED && builtPrimary.isNotEmpty()) {
+            // For sparse full-span patterns (e.g., chaotic attractors or delicate orbital curves whose
+            // total ink is < 44% of the canvas), gently compact coordinates toward viewport center
+            // BEFORE coverage calibration so side margins stay pure #000000 even when most segments draw.
+            val probeCovered = BooleanArray(totalPixels)
+            var rawCoveredCount = 0
+            for (prims in builtPrimary) {
+                rawCoveredCount += markCellCoverage(prims, probeCovered, gridW, gridH, cellSize)
+            }
+            val rawCoverageFraction = rawCoveredCount.toFloat() / totalPixels.toFloat()
+            if (rawCoverageFraction < 0.44f) {
+                builtPrimary = builtPrimary.map { prims ->
+                    prims.map { compactPrimitiveTowardCenter(it, aspect) }
+                }
+            }
+        }
+
         val primaryThresholds = FloatArray(primaryCells.size)
         val primaryUniqueShares = FloatArray(primaryCells.size)
 
-        val sortedPrimaryIndices = primaryCells.indices.sortedByDescending { primaryCells[it].score }
+        val sortedPrimaryIndices = if (patternWeightMode == PatternWeightMode.CENTER_WEIGHTED) {
+            val centerScores = FloatArray(primaryCells.size) { idx ->
+                computeCenterPriorityScore(
+                    prims = builtPrimary[idx],
+                    field = field,
+                    tieBreaker = primaryCells[idx].score
+                )
+            }
+            primaryCells.indices.sortedByDescending { centerScores[it] }
+        } else {
+            primaryCells.indices.sortedByDescending { primaryCells[it].score }
+        }
         var coveredCount = 0
 
         for (idx in sortedPrimaryIndices) {
@@ -53,12 +86,23 @@ internal object CoverageCalibrator {
         // ratios than (1 - primaryCoverage). At higher black ratios, 0% of underlay tiles draw.
         val underlayCalibrated = ArrayList<VectorPrimitive>()
         if (coveredCount < (totalPixels * 0.985f).toInt()) {
-            val underlayCells = buildGaplessUnderlayMosaic(rng, field, aspect)
+            val underlayCells = buildGaplessUnderlayMosaic(rng, field, aspect, patternWeightMode)
             val builtUnderlay = underlayCells.map { it.build(0.5f) }
             val underlayThresholds = FloatArray(underlayCells.size)
             val underlayShares = FloatArray(underlayCells.size)
 
-            val sortedUnderlayIndices = underlayCells.indices.sortedByDescending { underlayCells[it].score }
+            val sortedUnderlayIndices = if (patternWeightMode == PatternWeightMode.CENTER_WEIGHTED) {
+                val underlayScores = FloatArray(underlayCells.size) { idx ->
+                    computeCenterPriorityScore(
+                        prims = builtUnderlay[idx],
+                        field = field,
+                        tieBreaker = underlayCells[idx].score
+                    )
+                }
+                underlayCells.indices.sortedByDescending { underlayScores[it] }
+            } else {
+                underlayCells.indices.sortedByDescending { underlayCells[it].score }
+            }
             for (idx in sortedUnderlayIndices) {
                 val prims = builtUnderlay[idx]
                 val newlyCovered = markCellCoverage(prims, covered, gridW, gridH, cellSize)
@@ -92,6 +136,109 @@ internal object CoverageCalibrator {
         return out
     }
 
+    private fun compactPrimitiveTowardCenter(
+        prim: VectorPrimitive,
+        aspect: Float
+    ): VectorPrimitive {
+        val cx = 0.5f
+        val cy = aspect * 0.5f
+        val scaleX = 0.66f
+        val scaleY = 0.70f
+        val scaleR = 0.68f
+        return when (prim) {
+            is PolygonPrimitive -> prim.copy(
+                vertices = prim.vertices.map { v ->
+                    Vec2(cx + (v.x - cx) * scaleX, cy + (v.y - cy) * scaleY)
+                }
+            )
+            is ArcSectorPrimitive -> prim.copy(
+                center = Vec2(cx + (prim.center.x - cx) * scaleX, cy + (prim.center.y - cy) * scaleY),
+                innerRadius = prim.innerRadius * scaleR,
+                outerRadius = prim.outerRadius * scaleR
+            )
+            is PolylineRibbonPrimitive -> prim.copy(
+                points = prim.points.map { v ->
+                    Vec2(cx + (v.x - cx) * scaleX, cy + (v.y - cy) * scaleY)
+                },
+                strokeWidthNorm = prim.strokeWidthNorm * 1.16f
+            )
+        }
+    }
+
+    /**
+     * Computes true center-outward priority score for a materialized cell by sampling its actual
+     * geometric ink footprint (polygon vertices/centroid, arc ring radii along sweep, polyline points)
+     * rather than relying on nominal centers or pattern-specific score overrides.
+     */
+    private fun computeCenterPriorityScore(
+        prims: List<VectorPrimitive>,
+        field: SculptField,
+        tieBreaker: Float
+    ): Float {
+        if (prims.isEmpty()) return 0f
+        var sumDist = 0f
+        var maxDist = 0f
+        var count = 0
+
+        fun recordSample(px: Float, py: Float) {
+            val d = field.evaluateCenterContourDistance(px, py)
+            sumDist += d
+            if (d > maxDist) maxDist = d
+            count++
+        }
+
+        for (p in prims) {
+            when (p) {
+                is PolygonPrimitive -> {
+                    if (p.vertices.isNotEmpty()) {
+                        var vx = 0f
+                        var vy = 0f
+                        for (v in p.vertices) {
+                            vx += v.x
+                            vy += v.y
+                            recordSample(v.x, v.y)
+                        }
+                        recordSample(vx / p.vertices.size, vy / p.vertices.size)
+                    }
+                }
+                is ArcSectorPrimitive -> {
+                    val rMid = (p.innerRadius + p.outerRadius) * 0.5f
+                    if (p.outerRadius <= 0.015f) {
+                        recordSample(p.center.x, p.center.y)
+                    } else {
+                        val samples = 5
+                        for (s in 0 until samples) {
+                            val deg = p.startAngleDeg + p.sweepAngleDeg * ((s + 0.5f) / samples)
+                            val rad = deg * (PI.toFloat() / 180f)
+                            val c = cos(rad)
+                            val sn = sin(rad)
+                            recordSample(p.center.x + rMid * c, p.center.y + rMid * sn)
+                            recordSample(p.center.x + p.outerRadius * c, p.center.y + p.outerRadius * sn)
+                        }
+                    }
+                }
+                is PolylineRibbonPrimitive -> {
+                    val pts = p.points
+                    if (pts.isNotEmpty()) {
+                        val step = max(1, pts.size / 5)
+                        var idx = 0
+                        while (idx < pts.size) {
+                            recordSample(pts[idx].x, pts[idx].y)
+                            idx += step
+                        }
+                        val last = pts.last()
+                        recordSample(last.x, last.y)
+                    }
+                }
+            }
+        }
+
+        if (count == 0) return 0f
+        val meanDist = sumDist / count.toFloat()
+        val combinedDist = 0.62f * meanDist + 0.38f * maxDist
+        return (4.5f - combinedDist) + tieBreaker.coerceIn(0f, 1f) * 0.002f
+    }
+
     private fun applyCellCalibration(
         prims: List<VectorPrimitive>,
         threshold: Float,
@@ -111,9 +258,10 @@ internal object CoverageCalibrator {
     private fun buildGaplessUnderlayMosaic(
         rng: Random,
         field: SculptField,
-        aspect: Float
+        aspect: Float,
+        patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL
     ): List<DraftCell> {
-        val cols = 10
+        val cols = if (patternWeightMode == PatternWeightMode.CENTER_WEIGHTED) 14 else 10
         val rows = max(12, (cols * aspect).roundToInt())
         val sx = 1f / cols
         val sy = aspect / rows

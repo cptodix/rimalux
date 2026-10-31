@@ -100,12 +100,14 @@ object WallpaperGeneratorEngine {
             colorFillMode = spec.colorFillMode,
             pitchBlackRatio = resolvedBlackRatio,
             intricacy = intricacy,
-            aspectRatio = aspectRatio
+            aspectRatio = aspectRatio,
+            patternWeightMode = spec.patternWeightMode
         )
     }
 
     /**
-     * Synthesizes a [SynthesizedWallpaper] from already-resolved pattern, colors, ratio, and intricacy.
+     * Synthesizes a [SynthesizedWallpaper] from already-resolved pattern, colors, ratio, intricacy,
+     * and [patternWeightMode].
      */
     fun synthesizeFromParameters(
         seed: Long,
@@ -114,7 +116,8 @@ object WallpaperGeneratorEngine {
         colorFillMode: ColorFillMode,
         pitchBlackRatio: Float,
         intricacy: Float,
-        aspectRatio: Float
+        aspectRatio: Float,
+        patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL
     ): SynthesizedWallpaper {
         val clampedRatio = DeepBlackRatioEngine.clampPitchBlackRatio(pitchBlackRatio)
         val safeColors = paletteColors.ifEmpty { StarterPalettes.defaults.first().colors }
@@ -122,7 +125,8 @@ object WallpaperGeneratorEngine {
             seed = seed,
             pattern = pattern,
             intricacy = intricacy,
-            aspectRatio = aspectRatio
+            aspectRatio = aspectRatio,
+            patternWeightMode = patternWeightMode
         )
         return SynthesizedWallpaper(
             seed = seed,
@@ -133,7 +137,8 @@ object WallpaperGeneratorEngine {
             intricacy = intricacy,
             aspectRatio = scene.aspectRatio,
             scene = scene,
-            ratioStats = scene.computeStats(clampedRatio)
+            ratioStats = scene.computeStats(clampedRatio),
+            patternWeightMode = patternWeightMode
         )
     }
 

@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.model.ArtPattern
 import com.example.model.PatternCategory
+import com.example.model.PatternWeightMode
 import com.example.model.labelRes
 import com.example.model.previewRes
 import com.example.model.subtitleRes
@@ -75,6 +76,7 @@ import com.example.ui.RimaluxUiState
 @Composable
 fun PatternsScreen(
     uiState: RimaluxUiState,
+    onSetPatternWeightMode: (PatternWeightMode) -> Unit = {},
     onSetRandomized: (Boolean) -> Unit,
     onTogglePattern: (ArtPattern) -> Unit,
     onSelectAllPatterns: () -> Unit,
@@ -177,6 +179,67 @@ fun PatternsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // Normal vs Center Weighted Tonal Selector Card (mirrors Colors page Color Shading card)
+                item(key = "pattern_weight_card") {
+                    Surface(
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.surfaceContainer
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.label_pattern_layout),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                SegmentedButton(
+                                    selected = uiState.config.patternWeightMode == PatternWeightMode.NORMAL,
+                                    onClick = { onSetPatternWeightMode(PatternWeightMode.NORMAL) },
+                                    icon = {},
+                                    colors = segmentedColors,
+                                    border = segmentedBorder,
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = 0,
+                                        count = 2,
+                                        baseShape = CircleShape
+                                    ),
+                                    modifier = Modifier
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("btn_weight_mode_normal")
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.weight_mode_normal),
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                                SegmentedButton(
+                                    selected = uiState.config.patternWeightMode == PatternWeightMode.CENTER_WEIGHTED,
+                                    onClick = { onSetPatternWeightMode(PatternWeightMode.CENTER_WEIGHTED) },
+                                    icon = {},
+                                    colors = segmentedColors,
+                                    border = segmentedBorder,
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = 1,
+                                        count = 2,
+                                        baseShape = CircleShape
+                                    ),
+                                    modifier = Modifier
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("btn_weight_mode_center")
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.weight_mode_center),
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Randomized vs Multi-Select Segmented Bar

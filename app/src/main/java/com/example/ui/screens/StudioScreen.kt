@@ -85,6 +85,7 @@ import com.example.model.ArtPattern
 import com.example.model.ColorFillMode
 import com.example.model.MockupOverlayMode
 import com.example.model.PaletteMode
+import com.example.model.PatternWeightMode
 import com.example.model.PitchBlackMode
 import com.example.model.titleRes
 import com.example.ui.RimaluxUiState
@@ -181,8 +182,13 @@ fun StudioScreen(
     onOpenLikeApp: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val weightShortLabel = when (uiState.config.patternWeightMode) {
+        PatternWeightMode.NORMAL -> stringResource(R.string.weight_short_normal)
+        PatternWeightMode.CENTER_WEIGHTED -> stringResource(R.string.weight_short_center)
+    }
+
     val patternsSummary = if (uiState.config.patternsRandomized) {
-        stringResource(R.string.summary_patterns_random, ArtPattern.entries.size)
+        stringResource(R.string.summary_patterns_random, ArtPattern.entries.size, weightShortLabel)
     } else {
         val names = uiState.config.selectedPatterns.take(2)
             .map { stringResource(it.titleRes).substringBefore(" ") }
@@ -190,7 +196,7 @@ fun StudioScreen(
         val suffix = if (uiState.config.selectedPatterns.size > 2) {
             " +${uiState.config.selectedPatterns.size - 2}"
         } else ""
-        stringResource(R.string.summary_patterns_selected, "$names$suffix")
+        stringResource(R.string.summary_patterns_selected, "$names$suffix", weightShortLabel)
     }
 
     val fillShortLabel = when (uiState.config.colorFillMode) {

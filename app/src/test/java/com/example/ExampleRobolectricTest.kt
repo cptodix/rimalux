@@ -27,6 +27,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ApplicationProvider
 import com.example.model.ArtPattern
 import com.example.model.MockupOverlayMode
+import com.example.model.PatternWeightMode
 import com.example.model.StarterPalettes
 import com.example.model.previewRes
 import com.example.scheduler.OemBackgroundHelper
@@ -106,7 +107,7 @@ class ExampleRobolectricTest {
         assertNotNull(context.getDrawable(R.drawable.ic_launcher_background))
         assertNotNull(context.getDrawable(R.mipmap.ic_launcher))
         assertNotNull(context.getDrawable(R.mipmap.ic_launcher_round))
-        assertEquals(64, ArtPattern.entries.size)
+        assertEquals(80, ArtPattern.entries.size)
         for (pattern in ArtPattern.entries) {
             val decoded = BitmapFactory.decodeResource(context.resources, pattern.previewRes)
             assertNotNull("Expected static preview drawable for ${pattern.id}", decoded)
@@ -894,13 +895,13 @@ class ExampleRobolectricTest {
             )
         }
 
-        // Direct action tap on $3 USD immediately sends thanks and closes dialog
+        // Direct action tap on $3 immediately sends thanks and closes dialog
         composeTestRule.onNodeWithTag("btn_tip_3").performClick()
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("dialog_send_thanks").assertDoesNotExist()
         val status = viewModel.uiState.value.statusMessage.orEmpty()
-        assertTrue("Expected thank-you status message, got: '$status'", status.contains("sending a $3 USD thanks"))
+        assertTrue("Expected thank-you status message, got: '$status'", status.contains("sending a $3 thanks"))
 
         // Reopen "Enjoying Rimalux?" -> tap "Rate the App"
         composeTestRule.onNodeWithTag("btn_like_the_app").performClick()
@@ -914,5 +915,67 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("dialog_like_app").assertDoesNotExist()
         val rateIntent = requireNotNull(Shadows.shadowOf(activity).nextStartedActivity)
         assertEquals(Intent.ACTION_VIEW, rateIntent.action)
+    }
+
+    @Test
+    fun patternsScreen_patternLayoutNormalAndCenterWeighted_updatesMainRowAndGeneratesCenterWeightedPreview() {
+        composeTestRule.waitForIdle()
+        val activity = composeTestRule.activity
+        val viewModel = ViewModelProvider(
+            activity,
+            RimaluxViewModel.Factory(activity)
+        )[RimaluxViewModel::class.java]
+
+        awaitPreviewReady(viewModel, requireAheadBuffer = true)
+        assertEquals(PatternWeightMode.NORMAL, viewModel.uiState.value.config.patternWeightMode)
+
+        // 1. Open bottom sheet on main page -> verify Patterns row shows "Random (80) · Normal" alongside selection mode
+        composeTestRule.onNodeWithTag("home_bottom_sheet_handle").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("home_settings_sheet").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Random (80) · Normal").assertIsDisplayed()
+
+        // 2. Navigate to Patterns page -> verify "Pattern Layout" card with "Normal" and "Center Weighted" options
+        composeTestRule.onNodeWithTag("pill_open_patterns").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(RimaluxScreen.PATTERNS, viewModel.uiState.value.currentScreen)
+        composeTestRule.onNodeWithText("Pattern Layout").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_weight_mode_normal").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_weight_mode_center").assertIsDisplayed()
+
+        // 3. Select "Center Weighted" and also pick a new procedural pattern (e.g. Laves Floret)
+        composeTestRule.onNodeWithTag("btn_weight_mode_center").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(PatternWeightMode.CENTER_WEIGHTED, viewModel.uiState.value.config.patternWeightMode)
+
+        // Return to Home while still in Randomized mode -> verify "Random (80) · Center Weighted"
+        composeTestRule.onNodeWithTag("btn_back_to_home").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(RimaluxScreen.HOME, viewModel.uiState.value.currentScreen)
+        composeTestRule.onNodeWithText("Random (80) · Center Weighted").assertIsDisplayed()
+
+        // Re-open Patterns -> select a custom new pattern ("Laves Floret") -> return to Home -> verify "<Pattern> · Center Weighted"
+        composeTestRule.onNodeWithTag("pill_open_patterns").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("patterns_screen_list")
+            .performScrollToNode(hasTestTag("pattern_card_laves_floret"))
+        composeTestRule.onNodeWithTag("pattern_card_laves_floret").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("btn_back_to_home").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Floret · Center Weighted").assertIsDisplayed()
+
+        // 4. Close sheet and swipe left -> verify next wallpaper uses LAVES_FLORET + CENTER_WEIGHTED
+        val seedBeforeSwipe = requireNotNull(viewModel.uiState.value.preview).seed
+        composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeLeft(startX = width * 0.85f, endX = width * 0.15f, durationMillis = 180L)
+        }
+        awaitPreviewReady(viewModel, previousSeed = seedBeforeSwipe, requireAheadBuffer = true)
+        val activePreview = requireNotNull(viewModel.uiState.value.preview)
+        assertEquals(ArtPattern.LAVES_FLORET, activePreview.pattern)
+        assertEquals(PatternWeightMode.CENTER_WEIGHTED, activePreview.patternWeightMode)
     }
 }

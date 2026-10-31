@@ -24,6 +24,7 @@ import com.example.model.GeneratorConfig
 import com.example.model.IntervalFormatter
 import com.example.model.MockupOverlayMode
 import com.example.model.PaletteMode
+import com.example.model.PatternWeightMode
 import com.example.model.PitchBlackMode
 import com.example.model.RandomPaletteGenerator
 import com.example.model.StarterPalettes
@@ -64,6 +65,7 @@ data class RenderedPreviewSnapshot(
     val colors: List<Long>,
     val pitchBlackRatio: Float,
     val colorFillMode: ColorFillMode,
+    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL,
     val intricacy: Float,
     val ratioStats: SceneRatioStats,
     val scene: VectorScene,
@@ -74,6 +76,7 @@ data class RenderedPreviewSnapshot(
             id = "gen_${System.currentTimeMillis()}_${seed.toString(16)}",
             seed = seed,
             pattern = pattern,
+            patternWeightMode = patternWeightMode,
             colorFillMode = colorFillMode,
             paletteColors = colors,
             pitchBlackRatio = pitchBlackRatio,
@@ -210,12 +213,15 @@ class RimaluxViewModel(
                         }
                         val effectiveIntricacy = stored.currentIntricacy
                             ?: GeneratorConfig.sampleIntricacyForSeed(stored.currentSeed)
+                        val effectiveWeightMode = stored.currentPatternWeightMode
+                            ?: stored.config.patternWeightMode
                         val rendered = buildRenderedPreview(
                             seed = stored.currentSeed,
                             pattern = patternToUse,
                             colors = colorsToUse,
                             pitchBlackRatio = effectiveBlackRatio,
                             colorFillMode = stored.config.colorFillMode,
+                            patternWeightMode = effectiveWeightMode,
                             intricacy = effectiveIntricacy
                         )
                         renderedCache[rendered.seed] = rendered
@@ -255,12 +261,15 @@ class RimaluxViewModel(
                     val effectiveBlackRatio = stored.currentPitchBlackRatio ?: stored.config.pitchBlackRatio
                     val effectiveIntricacy = stored.currentIntricacy
                         ?: GeneratorConfig.sampleIntricacyForSeed(seedToUse)
+                    val effectiveWeightMode = stored.currentPatternWeightMode
+                        ?: stored.config.patternWeightMode
                     val rendered = buildRenderedPreview(
                         seed = seedToUse,
                         pattern = patternToUse,
                         colors = colorsToUse,
                         pitchBlackRatio = effectiveBlackRatio,
                         colorFillMode = stored.config.colorFillMode,
+                        patternWeightMode = effectiveWeightMode,
                         intricacy = effectiveIntricacy
                     )
                     renderedCache[rendered.seed] = rendered
@@ -439,6 +448,7 @@ class RimaluxViewModel(
                     colors = immediatePrev.paletteColors,
                     pitchBlackRatio = immediatePrev.pitchBlackRatio,
                     colorFillMode = immediatePrev.colorFillMode,
+                    patternWeightMode = immediatePrev.patternWeightMode,
                     intricacy = immediatePrev.intricacy
                 )
                 renderedCache[immediatePrev.seed] = renderedPrev
@@ -619,6 +629,7 @@ class RimaluxViewModel(
                     colors = prevItem.paletteColors,
                     pitchBlackRatio = prevItem.pitchBlackRatio,
                     colorFillMode = prevItem.colorFillMode,
+                    patternWeightMode = prevItem.patternWeightMode,
                     intricacy = prevItem.intricacy
                 )
                 renderedCache[rendered.seed] = rendered
@@ -650,6 +661,7 @@ class RimaluxViewModel(
                 colors = target.paletteColors,
                 pitchBlackRatio = target.pitchBlackRatio,
                 colorFillMode = target.colorFillMode,
+                patternWeightMode = target.patternWeightMode,
                 intricacy = target.intricacy
             )
             renderedCache[target.seed] = rendered
@@ -704,6 +716,7 @@ class RimaluxViewModel(
         colors: List<Long>,
         pitchBlackRatio: Float,
         colorFillMode: ColorFillMode,
+        patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL,
         intricacy: Float
     ): RenderedPreviewSnapshot = withContext(Dispatchers.Default) {
         val synthesized = WallpaperGeneratorEngine.synthesizeFromParameters(
@@ -713,7 +726,8 @@ class RimaluxViewModel(
             colorFillMode = colorFillMode,
             pitchBlackRatio = pitchBlackRatio,
             intricacy = intricacy,
-            aspectRatio = screenAspect
+            aspectRatio = screenAspect,
+            patternWeightMode = patternWeightMode
         )
         rasterizeSynthesizedPreview(synthesized)
     }
@@ -737,6 +751,7 @@ class RimaluxViewModel(
             colors = synthesized.paletteColors,
             pitchBlackRatio = synthesized.pitchBlackRatio,
             colorFillMode = synthesized.colorFillMode,
+            patternWeightMode = synthesized.patternWeightMode,
             intricacy = synthesized.intricacy,
             ratioStats = synthesized.ratioStats,
             scene = synthesized.scene,
@@ -860,6 +875,7 @@ class RimaluxViewModel(
                         id = "gen_${System.currentTimeMillis()}_lock_${lockGen.seed.toString(16)}",
                         seed = lockGen.seed,
                         pattern = lockGen.pattern,
+                        patternWeightMode = lockGen.patternWeightMode,
                         colorFillMode = cfg.colorFillMode,
                         paletteColors = lockGen.paletteColors,
                         pitchBlackRatio = lockGen.pitchBlackRatio,
@@ -1050,6 +1066,18 @@ class RimaluxViewModel(
     }
 
     // --- Procedural Pattern Controls (Rebuilds ahead queue for next swipe-left) ---
+    fun setPatternWeightMode(weightMode: PatternWeightMode) {
+        if (_uiState.value.config.patternWeightMode == weightMode) return
+        _uiState.update { state ->
+            state.copy(
+                config = state.config.copy(patternWeightMode = weightMode),
+                hasUnappliedChanges = true
+            )
+        }
+        persistConfigChanges(debounceMs = 0L)
+        invalidateAheadAndPrefetch(debounceMs = 0L)
+    }
+
     fun setPatternsRandomized(randomized: Boolean) {
         if (_uiState.value.config.patternsRandomized == randomized) return
         _uiState.update { state ->

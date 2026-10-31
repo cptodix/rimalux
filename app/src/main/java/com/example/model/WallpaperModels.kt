@@ -14,6 +14,7 @@ import kotlin.random.Random
  */
 typealias PatternCategory = com.example.engine.PatternCategory
 typealias ArtPattern = com.example.engine.ArtPattern
+typealias PatternWeightMode = com.example.engine.PatternWeightMode
 typealias ColorFillMode = com.example.engine.ColorFillMode
 typealias PaletteMode = com.example.engine.PaletteMode
 typealias PitchBlackMode = com.example.engine.PitchBlackMode
@@ -58,6 +59,7 @@ enum class MockupOverlayMode {
 data class GeneratorConfig(
     val patternsRandomized: Boolean = true,
     val selectedPatterns: Set<ArtPattern> = CoreGenerationSpec.DEFAULT_SELECTED_PATTERNS,
+    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL,
     val colorFillMode: ColorFillMode = ColorFillMode.GRADIENT,
     val paletteMode: PaletteMode = PaletteMode.RANDOMIZED,
     val selectedPaletteIds: Set<String> = setOf("obsidian_aurora"),
@@ -74,6 +76,7 @@ data class GeneratorConfig(
     fun toCoreSpec(): CoreGenerationSpec = CoreGenerationSpec(
         patternsRandomized = patternsRandomized,
         selectedPatterns = selectedPatterns,
+        patternWeightMode = patternWeightMode,
         colorFillMode = colorFillMode,
         paletteMode = paletteMode,
         selectedPaletteIds = selectedPaletteIds,
@@ -114,7 +117,8 @@ data class GeneratedHistoryItem(
     val pitchBlackRatio: Float,
     val intricacy: Float,
     val timestampMillis: Long,
-    val wasAutoScheduled: Boolean
+    val wasAutoScheduled: Boolean,
+    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL
 )
 
 object IntervalFormatter {

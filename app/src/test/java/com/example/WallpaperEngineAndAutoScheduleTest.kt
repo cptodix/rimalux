@@ -22,6 +22,7 @@ import com.example.model.ArtPattern
 import com.example.model.ColorFillMode
 import com.example.model.GeneratedHistoryItem
 import com.example.model.GeneratorConfig
+import com.example.model.PatternWeightMode
 import com.example.model.PitchBlackMode
 import com.example.model.RandomPaletteGenerator
 import com.example.scheduler.BootCompletedReceiver
@@ -55,7 +56,7 @@ class WallpaperEngineAndAutoScheduleTest {
 
     @Test
     fun allSixtyFourMathPatterns_calibratedPixelCoverage_accuratelyRespectPitchBlackRatioAcrossSeeds() {
-        assertEquals(64, ArtPattern.entries.size)
+        assertEquals(80, ArtPattern.entries.size)
         val randomPalette = RandomPaletteGenerator.generate(987654321L)
         assertTrue("Expected at least 4 harmonious colors", randomPalette.size >= 4)
 
@@ -100,6 +101,112 @@ class WallpaperEngineAndAutoScheduleTest {
         assertTrue(
             "Pitch-black calibration deviations:\n${failures.joinToString("\n")}",
             failures.isEmpty()
+        )
+    }
+
+    @Test
+    fun centerWeightedMode_clumpsGraphicsInMiddleWithEmptySidesAndRespectsTrueBlackRatio() {
+        val palette = RandomPaletteGenerator.generate(246813579L)
+        val representativePatterns = listOf(
+            ArtPattern.SILK_RIBBONS,
+            ArtPattern.CRYSTAL_VORONOI,
+            ArtPattern.SACRED_MANDALA,
+            ArtPattern.ISOMETRIC_MONUMENT,
+            ArtPattern.CLIFFORD_ATTRACTOR,
+            ArtPattern.FARADAY_RIPPLES,
+            ArtPattern.ENNEAGRAM_STAR,
+            ArtPattern.SRI_YANTRA_TRIANGLES,
+            ArtPattern.CALATRAVA_RIBS,
+            ArtPattern.DIAGRID_SKYSCRAPER,
+            ArtPattern.LAVES_FLORET,
+            ArtPattern.GOSPER_FLOWSNAKE
+        )
+        val failures = ArrayList<String>()
+        var totalSideBlackSum = 0.0
+        var totalCenterBlackSum = 0.0
+
+        for (pattern in representativePatterns) {
+            val seed = 555_001L + pattern.ordinal * 4099L
+            val centerScene = MathPatternGenerator.generate(
+                seed = seed,
+                pattern = pattern,
+                intricacy = 0.55f,
+                aspectRatio = 2.0f,
+                patternWeightMode = PatternWeightMode.CENTER_WEIGHTED
+            )
+
+            var prevMeasured = -1
+            for (target in floatArrayOf(0.25f, 0.65f, 0.85f)) {
+                val bmp = WallpaperRenderer.renderToBitmap(
+                    scene = centerScene,
+                    paletteColors = palette,
+                    pitchBlackRatio = target,
+                    widthPx = 420,
+                    heightPx = 840,
+                    colorFillMode = ColorFillMode.GRADIENT
+                )
+                val measured = WallpaperRenderer.sampleTrueBlackPercentage(bmp)
+                bmp.recycle()
+
+                val targetPct = (target * 100f).toInt()
+                val diff = abs(measured - targetPct)
+                if (diff > 7) {
+                    failures.add("$pattern(CENTER_WEIGHTED): target=$targetPct% measured=$measured% (diff=$diff%)")
+                }
+                if (measured <= prevMeasured) {
+                    failures.add("$pattern(CENTER_WEIGHTED): non-monotonic $measured% <= $prevMeasured%")
+                }
+                prevMeasured = measured
+            }
+
+            // Measure side margin emptiness vs center richness at 82% True Black Ratio
+            val bmp82 = WallpaperRenderer.renderToBitmap(
+                scene = centerScene,
+                paletteColors = palette,
+                pitchBlackRatio = 0.82f,
+                widthPx = 360,
+                heightPx = 720,
+                colorFillMode = ColorFillMode.GRADIENT
+            )
+            var sideTotal = 0
+            var sideBlack = 0
+            var midTotal = 0
+            var midBlack = 0
+            for (y in 0 until bmp82.height step 4) {
+                val ny = y.toFloat() / bmp82.height
+                for (x in 0 until bmp82.width step 4) {
+                    val nx = x.toFloat() / bmp82.width
+                    val isBlack = (bmp82.getPixel(x, y) and 0x00FFFFFF) == 0
+                    if (nx < 0.14f || nx > 0.86f) {
+                        sideTotal += 1
+                        if (isBlack) sideBlack += 1
+                    } else if (nx in 0.30f..0.70f && ny in 0.32f..0.68f) {
+                        midTotal += 1
+                        if (isBlack) midBlack += 1
+                    }
+                }
+            }
+            bmp82.recycle()
+
+            val sideBlackRatio = sideBlack.toDouble() / sideTotal.coerceAtLeast(1)
+            val midBlackRatio = midBlack.toDouble() / midTotal.coerceAtLeast(1)
+            totalSideBlackSum += sideBlackRatio
+            totalCenterBlackSum += midBlackRatio
+        }
+
+        assertTrue(
+            "Center-weighted pixel calibration deviations:\n${failures.joinToString("\n")}",
+            failures.isEmpty()
+        )
+        val avgSideBlack = totalSideBlackSum / representativePatterns.size
+        val avgCenterBlack = totalCenterBlackSum / representativePatterns.size
+        assertTrue(
+            "Expected side margins in CENTER_WEIGHTED mode to stay mostly empty OLED black (>= 90%, got ${(avgSideBlack * 100).toInt()}%)",
+            avgSideBlack >= 0.90
+        )
+        assertTrue(
+            "Expected middle region to hold significantly more colored pattern than sides (midBlack=${(avgCenterBlack * 100).toInt()}% vs sideBlack=${(avgSideBlack * 100).toInt()}%)",
+            avgCenterBlack + 0.25 < avgSideBlack
         )
     }
 

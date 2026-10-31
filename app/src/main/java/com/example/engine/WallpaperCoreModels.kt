@@ -27,7 +27,7 @@ enum class ArtPattern(
     val defaultTitle: String,
     val defaultSubtitle: String
 ) {
-    // Flow & Waves (19 patterns)
+    // Flow & Waves (23 patterns)
     SILK_RIBBONS(
         id = "silk_ribbons",
         category = PatternCategory.FLOW_WAVES,
@@ -142,8 +142,32 @@ enum class ArtPattern(
         defaultTitle = "Cassini Ovals",
         defaultSubtitle = "Bipolar constant-product lemniscates"
     ),
+    CLIFFORD_ATTRACTOR(
+        id = "clifford_attractor",
+        category = PatternCategory.FLOW_WAVES,
+        defaultTitle = "Clifford Strange",
+        defaultSubtitle = "Iterated trigonometric phase veil"
+    ),
+    FARADAY_RIPPLES(
+        id = "faraday_ripples",
+        category = PatternCategory.FLOW_WAVES,
+        defaultTitle = "Faraday Standing",
+        defaultSubtitle = "Parametric capillary wave lattice"
+    ),
+    BERNOULLI_SPIRALS(
+        id = "bernoulli_spirals",
+        category = PatternCategory.FLOW_WAVES,
+        defaultTitle = "Spira Mirabilis",
+        defaultSubtitle = "Dual counter-rotating equiangular arms"
+    ),
+    SOLITON_TRAINS(
+        id = "soliton_trains",
+        category = PatternCategory.FLOW_WAVES,
+        defaultTitle = "KdV Solitons",
+        defaultSubtitle = "Interacting nonlinear sech² wave pulses"
+    ),
 
-    // Symmetry & Sacred Geometry (17 patterns)
+    // Symmetry & Sacred Geometry (21 patterns)
     SACRED_MANDALA(
         id = "sacred_mandala",
         category = PatternCategory.SACRED_SYMMETRY,
@@ -246,8 +270,32 @@ enum class ArtPattern(
         defaultTitle = "Triskelion Spirals",
         defaultSubtitle = "Multi-arm counter-spun spiral blades"
     ),
+    ENNEAGRAM_STAR(
+        id = "enneagram_star",
+        category = PatternCategory.SACRED_SYMMETRY,
+        defaultTitle = "Enneagram Rosette",
+        defaultSubtitle = "9-fold nonagonal chord & petal mandala"
+    ),
+    RHODONEA_BLOOM(
+        id = "rhodonea_bloom",
+        category = PatternCategory.SACRED_SYMMETRY,
+        defaultTitle = "Rhodonea Curves",
+        defaultSubtitle = "Harmonic Grandi polar petal shells"
+    ),
+    EPITROCHOID_CROWN(
+        id = "epitrochoid_crown",
+        category = PatternCategory.SACRED_SYMMETRY,
+        defaultTitle = "Epitrochoid Crown",
+        defaultSubtitle = "Rolling planetary orbital cusps & loops"
+    ),
+    SRI_YANTRA_TRIANGLES(
+        id = "sri_yantra_triangles",
+        category = PatternCategory.SACRED_SYMMETRY,
+        defaultTitle = "Yantra Interlace",
+        defaultSubtitle = "Interlocking sacred triangles & lotus"
+    ),
 
-    // Architectural & Constructivist (13 patterns)
+    // Architectural & Constructivist (17 patterns)
     ISOMETRIC_MONUMENT(
         id = "isometric_monument",
         category = PatternCategory.ARCHITECTURAL,
@@ -326,8 +374,32 @@ enum class ArtPattern(
         defaultTitle = "Suprematist Planes",
         defaultSubtitle = "Cantilevered constructivist vectors"
     ),
+    CALATRAVA_RIBS(
+        id = "calatrava_ribs",
+        category = PatternCategory.ARCHITECTURAL,
+        defaultTitle = "Vaulted Parabolas",
+        defaultSubtitle = "Sweeping parabolic rib-arch colonnade"
+    ),
+    HEXAGONAL_BASALT(
+        id = "hexagonal_basalt",
+        category = PatternCategory.ARCHITECTURAL,
+        defaultTitle = "Basalt Columns",
+        defaultSubtitle = "Axonometric stepped hexagonal pillars"
+    ),
+    METABOLIST_CAPSULES(
+        id = "metabolist_capsules",
+        category = PatternCategory.ARCHITECTURAL,
+        defaultTitle = "Capsule Towers",
+        defaultSubtitle = "Modular cantilevered oculus pods"
+    ),
+    DIAGRID_SKYSCRAPER(
+        id = "diagrid_skyscraper",
+        category = PatternCategory.ARCHITECTURAL,
+        defaultTitle = "Diagrid Atrium",
+        defaultSubtitle = "Tapered structural diamond exoskeleton"
+    ),
 
-    // Tessellations & Lattices (15 patterns)
+    // Tessellations & Lattices (19 patterns)
     CRYSTAL_VORONOI(
         id = "crystal_voronoi",
         category = PatternCategory.TESSELLATION,
@@ -417,10 +489,44 @@ enum class ArtPattern(
         category = PatternCategory.TESSELLATION,
         defaultTitle = "Pythagoras Fractal",
         defaultSubtitle = "Recursive right-triangle square canopy"
+    ),
+    LAVES_FLORET(
+        id = "laves_floret",
+        category = PatternCategory.TESSELLATION,
+        defaultTitle = "Floret Pentagons",
+        defaultSubtitle = "6-fold chiral Laves pentagonal rosettes"
+    ),
+    KITE_DART_STAR(
+        id = "kite_dart_star",
+        category = PatternCategory.TESSELLATION,
+        defaultTitle = "Decagonal Stars",
+        defaultSubtitle = "5-fold golden kite & dart sunburst tiling"
+    ),
+    TRIANGULAR_GYROID(
+        id = "triangular_gyroid",
+        category = PatternCategory.TESSELLATION,
+        defaultTitle = "Triangular Bevels",
+        defaultSubtitle = "3-way isometric cube-corner lattice"
+    ),
+    GOSPER_FLOWSNAKE(
+        id = "gosper_flowsnake",
+        category = PatternCategory.TESSELLATION,
+        defaultTitle = "Gosper Island",
+        defaultSubtitle = "Hexagonal recursive Peano-Gosper tiles"
     );
 
     companion object {
         fun fromId(id: String): ArtPattern? = entries.find { it.id == id }
+    }
+}
+
+enum class PatternWeightMode(val id: String) {
+    NORMAL("normal"),
+    CENTER_WEIGHTED("center_weighted");
+
+    companion object {
+        fun fromId(id: String): PatternWeightMode =
+            entries.find { it.id == id } ?: NORMAL
     }
 }
 
@@ -467,6 +573,7 @@ data class ColorPalette(
 data class CoreGenerationSpec(
     val patternsRandomized: Boolean = true,
     val selectedPatterns: Set<ArtPattern> = DEFAULT_SELECTED_PATTERNS,
+    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL,
     val colorFillMode: ColorFillMode = ColorFillMode.GRADIENT,
     val paletteMode: PaletteMode = PaletteMode.RANDOMIZED,
     val selectedPaletteIds: Set<String> = setOf("obsidian_aurora"),
@@ -499,7 +606,8 @@ data class SynthesizedWallpaper(
     val intricacy: Float,
     val aspectRatio: Float,
     val scene: VectorScene,
-    val ratioStats: SceneRatioStats
+    val ratioStats: SceneRatioStats,
+    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL
 )
 
 object StarterPalettes {

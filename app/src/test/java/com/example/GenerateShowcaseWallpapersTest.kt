@@ -29,7 +29,7 @@ class GenerateShowcaseWallpapersTest {
         val artifactDir = File("/.aistudio/artifacts/brain/b476f231-ba4b-4ca3-9c02-cc2ef6b81a16").apply { mkdirs() }
 
         val patterns = ArtPattern.entries
-        assertEquals(64, patterns.size)
+        assertEquals(80, patterns.size)
 
         val width = 1080
         val height = 1920
@@ -68,7 +68,7 @@ class GenerateShowcaseWallpapersTest {
             generatedFiles.add(fileBuild)
         }
 
-        assertEquals(64, generatedFiles.size)
+        assertEquals(80, generatedFiles.size)
 
         // Package into ZIP files
         val zipFiles = listOf(

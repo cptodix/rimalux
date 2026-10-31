@@ -364,7 +364,8 @@ object WallpaperScheduler {
                     pitchBlackRatio = lockGen.pitchBlackRatio,
                     intricacy = lockGen.intricacy,
                     timestampMillis = nowMillis,
-                    wasAutoScheduled = wasScheduled
+                    wasAutoScheduled = wasScheduled,
+                    patternWeightMode = lockGen.patternWeightMode
                 )
                 res
             } else {
@@ -406,7 +407,8 @@ object WallpaperScheduler {
                 pitchBlackRatio = homeSynthesized.pitchBlackRatio,
                 intricacy = homeSynthesized.intricacy,
                 timestampMillis = nowMillis,
-                wasAutoScheduled = wasScheduled
+                wasAutoScheduled = wasScheduled,
+                patternWeightMode = homeSynthesized.patternWeightMode
             )
             repository.recordAutoRotationAtomically(
                 primaryItem = homeHistoryItem,

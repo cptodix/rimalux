@@ -157,6 +157,7 @@ fun RimaluxApp(
                         RimaluxScreen.PATTERNS -> {
                             PatternsScreen(
                                 uiState = uiState,
+                                onSetPatternWeightMode = viewModel::setPatternWeightMode,
                                 onSetRandomized = viewModel::setPatternsRandomized,
                                 onTogglePattern = viewModel::togglePatternSelection,
                                 onSelectAllPatterns = viewModel::selectAllPatterns,

@@ -13,10 +13,10 @@ Make sure to also read [`../AGENTS.md`](../AGENTS.md) for mandatory project rule
 │                  com.example.engine  (100% Pure Kotlin)                   │
 │  Zero Android, Compose, R.*, Context, Bitmap, DataStore, or UI imports!   │
 │                                                                           │
-│  • WallpaperCoreModels.kt     (ArtPattern[64], ColorPalette, CoreSpec)    │
+│  • WallpaperCoreModels.kt     (ArtPattern[80], WeightMode, CoreSpec)      │
 │  • WallpaperGeneratorEngine.kt(Single portable synthesis entry point)     │
-│  • MathPatternGenerator.kt    (Seeded PRNG + SculptField + 64 dispatch)   │
-│  • *Patterns.kt (9 files)     (64 procedural geometry algorithms)         │
+│  • MathPatternGenerator.kt    (Seeded PRNG + SculptField + 80 dispatch)   │
+│  • *Patterns.kt (11 files)    (80 procedural geometry algorithms)         │
 │  • VectorPrimitives.kt        (Vec2, Polygon, ArcSector, PolylineRibbon)  │
 │  • CoverageCalibrator.kt      (200xH 2D coverage rasterizer & underlay)   │
 │  • DeepBlackRatioEngine.kt    (#000000 ratio math, pixel sampler, scale)  │
@@ -61,10 +61,13 @@ Every pattern in `com.example.engine` generates geometry inside an aspect-correc
 
 Because `1.0` unit in `x` equals `1.0` unit in `y` in physical pixel distance, circles, logarithmic spirals, regular polygons, and sacred geometry angles remain 100% distortion-free on portrait phones, unfolded foldables, tablets, and desktop monitors.
 
-### 2.2 `SculptField` & `DraftCell` Pipeline
-1. `MathPatternGenerator.generate(seed, pattern, intricacy, aspectRatio)` initializes a deterministic `Random(seed)` and constructs a multi-octave spatial `SculptField(rng, safeAspect)`.
-2. The selected pattern builder produces `List<DraftCell>`. Each `DraftCell` has:
-   - `score: Float` (spatial priority evaluated via `SculptField` so negative `#000000` space forms cohesive, balanced sculptural voids rather than clustering in one corner),
+### 2.2 `SculptField`, `PatternWeightMode` & `DraftCell` Pipeline
+1. `MathPatternGenerator.generate(seed, pattern, intricacy, aspectRatio, patternWeightMode)` initializes a deterministic `Random(seed)` and constructs a multi-octave spatial `SculptField(rng, safeAspect, patternWeightMode)`.
+2. When `patternWeightMode == PatternWeightMode.CENTER_WEIGHTED`:
+   - `SculptField.evaluateCenterContourDistance(x, y)` computes an aspect-aware radial contour distance from `(0.5f, aspect * 0.5f)`.
+   - `CoverageCalibrator.calibrate(...)` compacts sparse full-span primary geometry toward `(0.5f, aspect * 0.5f)` and re-ranks `DraftCell`s + underlay mosaic tiles strictly from the center outward so graphics clump in the middle with empty `#000000` space on the sides while preserving exact `#000000` True Black Ratio calibration.
+3. The selected pattern builder produces `List<DraftCell>`. Each `DraftCell` has:
+   - `score: Float` (spatial priority evaluated via `SculptField`),
    - `area: Float` (relative weight within multi-primitive cells),
    - `build: (assignedThreshold: Float) -> List<VectorPrimitive>`.
 
@@ -151,5 +154,5 @@ Given a `SynthesizedWallpaper` (or `VectorScene` + `paletteColors` + `pitchBlack
 | Apply / Export Dialog | `dialog_set_wallpaper_target`, `target_option_<id>`, `btn_save_to_device`, `btn_share_wallpaper` | Double-tap wallpaper apply, lossless PNG save & share |
 | Auto-Change Section | `switch_auto_rotate`, `card_auto_target_picker`, `card_interval_picker`, `btn_auto_change_troubleshoot` | Background schedule controls & help entry |
 | Auto-Change Help | `auto_change_help_screen`, `vendor_chip_<id>`, `btn_open_vendor_settings`, `btn_open_app_info_settings` | OEM battery-saver guide & deep-link shortcuts |
-| Patterns Screen | `patterns_mode_random`, `patterns_mode_select`, `btn_patterns_all`, `btn_patterns_none`, `pattern_card_<id>` | 64-pattern randomization & custom multi-select |
+| Patterns Screen | `btn_weight_mode_normal`, `btn_weight_mode_center`, `btn_patterns_random`, `btn_patterns_multiselect`, `pattern_card_<id>` | Normal/Center Weighted layout & 80-pattern selection |
 | Colors Screen | `fill_mode_solid`, `fill_mode_gradient`, `palette_mode_random`, `palette_mode_list`, `btn_shuffle_random_colors`, `btn_open_create_palette` | Solid/Gradient fill & palette selection/creation |

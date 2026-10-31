@@ -42,6 +42,10 @@ val ArtPattern.titleRes: Int
         ArtPattern.AIRY_WAVEFRONT -> R.string.pattern_airy_wavefront
         ArtPattern.ROSSLER_SPIRAL -> R.string.pattern_rossler_spiral
         ArtPattern.CASSINI_LEMNISCATE -> R.string.pattern_cassini_lemniscate
+        ArtPattern.CLIFFORD_ATTRACTOR -> R.string.pattern_clifford_attractor
+        ArtPattern.FARADAY_RIPPLES -> R.string.pattern_faraday_ripples
+        ArtPattern.BERNOULLI_SPIRALS -> R.string.pattern_bernoulli_spirals
+        ArtPattern.SOLITON_TRAINS -> R.string.pattern_soliton_trains
 
         ArtPattern.SACRED_MANDALA -> R.string.pattern_sacred_mandala
         ArtPattern.GUILLOCHE_ROSETTE -> R.string.pattern_guilloche_rosette
@@ -60,6 +64,10 @@ val ArtPattern.titleRes: Int
         ArtPattern.ZELLIJ_KHATAM -> R.string.pattern_zellij_khatam
         ArtPattern.VESICA_LENSES -> R.string.pattern_vesica_lenses
         ArtPattern.TRISKELION_SPIRALS -> R.string.pattern_triskelion_spirals
+        ArtPattern.ENNEAGRAM_STAR -> R.string.pattern_enneagram_star
+        ArtPattern.RHODONEA_BLOOM -> R.string.pattern_rhodonea_bloom
+        ArtPattern.EPITROCHOID_CROWN -> R.string.pattern_epitrochoid_crown
+        ArtPattern.SRI_YANTRA_TRIANGLES -> R.string.pattern_sri_yantra_triangles
 
         ArtPattern.ISOMETRIC_MONUMENT -> R.string.pattern_isometric_monument
         ArtPattern.BAUHAUS_CONSTRUCT -> R.string.pattern_bauhaus_construct
@@ -74,6 +82,10 @@ val ArtPattern.titleRes: Int
         ArtPattern.KINETIC_FACADE -> R.string.pattern_kinetic_facade
         ArtPattern.PANTHEON_OCULUS -> R.string.pattern_pantheon_oculus
         ArtPattern.SUPREMATIST_PLANES -> R.string.pattern_suprematist_planes
+        ArtPattern.CALATRAVA_RIBS -> R.string.pattern_calatrava_ribs
+        ArtPattern.HEXAGONAL_BASALT -> R.string.pattern_hexagonal_basalt
+        ArtPattern.METABOLIST_CAPSULES -> R.string.pattern_metabolist_capsules
+        ArtPattern.DIAGRID_SKYSCRAPER -> R.string.pattern_diagrid_skyscraper
 
         ArtPattern.CRYSTAL_VORONOI -> R.string.pattern_crystal_voronoi
         ArtPattern.PENROSE_QUASICRYSTAL -> R.string.pattern_penrose_quasicrystal
@@ -90,6 +102,10 @@ val ArtPattern.titleRes: Int
         ArtPattern.ARCHIMEDEAN_SNUB -> R.string.pattern_archimedean_snub
         ArtPattern.AMMANN_QUASICRYSTAL -> R.string.pattern_ammann_quasicrystal
         ArtPattern.PYTHAGORAS_CANOPY -> R.string.pattern_pythagoras_canopy
+        ArtPattern.LAVES_FLORET -> R.string.pattern_laves_floret
+        ArtPattern.KITE_DART_STAR -> R.string.pattern_kite_dart_star
+        ArtPattern.TRIANGULAR_GYROID -> R.string.pattern_triangular_gyroid
+        ArtPattern.GOSPER_FLOWSNAKE -> R.string.pattern_gosper_flowsnake
     }
 
 @get:StringRes
@@ -114,6 +130,10 @@ val ArtPattern.subtitleRes: Int
         ArtPattern.AIRY_WAVEFRONT -> R.string.pattern_airy_wavefront_sub
         ArtPattern.ROSSLER_SPIRAL -> R.string.pattern_rossler_spiral_sub
         ArtPattern.CASSINI_LEMNISCATE -> R.string.pattern_cassini_lemniscate_sub
+        ArtPattern.CLIFFORD_ATTRACTOR -> R.string.pattern_clifford_attractor_sub
+        ArtPattern.FARADAY_RIPPLES -> R.string.pattern_faraday_ripples_sub
+        ArtPattern.BERNOULLI_SPIRALS -> R.string.pattern_bernoulli_spirals_sub
+        ArtPattern.SOLITON_TRAINS -> R.string.pattern_soliton_trains_sub
 
         ArtPattern.SACRED_MANDALA -> R.string.pattern_sacred_mandala_sub
         ArtPattern.GUILLOCHE_ROSETTE -> R.string.pattern_guilloche_rosette_sub
@@ -132,6 +152,10 @@ val ArtPattern.subtitleRes: Int
         ArtPattern.ZELLIJ_KHATAM -> R.string.pattern_zellij_khatam_sub
         ArtPattern.VESICA_LENSES -> R.string.pattern_vesica_lenses_sub
         ArtPattern.TRISKELION_SPIRALS -> R.string.pattern_triskelion_spirals_sub
+        ArtPattern.ENNEAGRAM_STAR -> R.string.pattern_enneagram_star_sub
+        ArtPattern.RHODONEA_BLOOM -> R.string.pattern_rhodonea_bloom_sub
+        ArtPattern.EPITROCHOID_CROWN -> R.string.pattern_epitrochoid_crown_sub
+        ArtPattern.SRI_YANTRA_TRIANGLES -> R.string.pattern_sri_yantra_triangles_sub
 
         ArtPattern.ISOMETRIC_MONUMENT -> R.string.pattern_isometric_monument_sub
         ArtPattern.BAUHAUS_CONSTRUCT -> R.string.pattern_bauhaus_construct_sub
@@ -146,6 +170,10 @@ val ArtPattern.subtitleRes: Int
         ArtPattern.KINETIC_FACADE -> R.string.pattern_kinetic_facade_sub
         ArtPattern.PANTHEON_OCULUS -> R.string.pattern_pantheon_oculus_sub
         ArtPattern.SUPREMATIST_PLANES -> R.string.pattern_suprematist_planes_sub
+        ArtPattern.CALATRAVA_RIBS -> R.string.pattern_calatrava_ribs_sub
+        ArtPattern.HEXAGONAL_BASALT -> R.string.pattern_hexagonal_basalt_sub
+        ArtPattern.METABOLIST_CAPSULES -> R.string.pattern_metabolist_capsules_sub
+        ArtPattern.DIAGRID_SKYSCRAPER -> R.string.pattern_diagrid_skyscraper_sub
 
         ArtPattern.CRYSTAL_VORONOI -> R.string.pattern_crystal_voronoi_sub
         ArtPattern.PENROSE_QUASICRYSTAL -> R.string.pattern_penrose_quasicrystal_sub
@@ -162,6 +190,10 @@ val ArtPattern.subtitleRes: Int
         ArtPattern.ARCHIMEDEAN_SNUB -> R.string.pattern_archimedean_snub_sub
         ArtPattern.AMMANN_QUASICRYSTAL -> R.string.pattern_ammann_quasicrystal_sub
         ArtPattern.PYTHAGORAS_CANOPY -> R.string.pattern_pythagoras_canopy_sub
+        ArtPattern.LAVES_FLORET -> R.string.pattern_laves_floret_sub
+        ArtPattern.KITE_DART_STAR -> R.string.pattern_kite_dart_star_sub
+        ArtPattern.TRIANGULAR_GYROID -> R.string.pattern_triangular_gyroid_sub
+        ArtPattern.GOSPER_FLOWSNAKE -> R.string.pattern_gosper_flowsnake_sub
     }
 
 @get:DrawableRes
@@ -186,6 +218,10 @@ val ArtPattern.previewRes: Int
         ArtPattern.AIRY_WAVEFRONT -> R.drawable.pattern_preview_airy_wavefront
         ArtPattern.ROSSLER_SPIRAL -> R.drawable.pattern_preview_rossler_spiral
         ArtPattern.CASSINI_LEMNISCATE -> R.drawable.pattern_preview_cassini_lemniscate
+        ArtPattern.CLIFFORD_ATTRACTOR -> R.drawable.pattern_preview_clifford_attractor
+        ArtPattern.FARADAY_RIPPLES -> R.drawable.pattern_preview_faraday_ripples
+        ArtPattern.BERNOULLI_SPIRALS -> R.drawable.pattern_preview_bernoulli_spirals
+        ArtPattern.SOLITON_TRAINS -> R.drawable.pattern_preview_soliton_trains
 
         ArtPattern.SACRED_MANDALA -> R.drawable.pattern_preview_sacred_mandala
         ArtPattern.GUILLOCHE_ROSETTE -> R.drawable.pattern_preview_guilloche_rosette
@@ -204,6 +240,10 @@ val ArtPattern.previewRes: Int
         ArtPattern.ZELLIJ_KHATAM -> R.drawable.pattern_preview_zellij_khatam
         ArtPattern.VESICA_LENSES -> R.drawable.pattern_preview_vesica_lenses
         ArtPattern.TRISKELION_SPIRALS -> R.drawable.pattern_preview_triskelion_spirals
+        ArtPattern.ENNEAGRAM_STAR -> R.drawable.pattern_preview_enneagram_star
+        ArtPattern.RHODONEA_BLOOM -> R.drawable.pattern_preview_rhodonea_bloom
+        ArtPattern.EPITROCHOID_CROWN -> R.drawable.pattern_preview_epitrochoid_crown
+        ArtPattern.SRI_YANTRA_TRIANGLES -> R.drawable.pattern_preview_sri_yantra_triangles
 
         ArtPattern.ISOMETRIC_MONUMENT -> R.drawable.pattern_preview_isometric_monument
         ArtPattern.BAUHAUS_CONSTRUCT -> R.drawable.pattern_preview_bauhaus_construct
@@ -218,6 +258,10 @@ val ArtPattern.previewRes: Int
         ArtPattern.KINETIC_FACADE -> R.drawable.pattern_preview_kinetic_facade
         ArtPattern.PANTHEON_OCULUS -> R.drawable.pattern_preview_pantheon_oculus
         ArtPattern.SUPREMATIST_PLANES -> R.drawable.pattern_preview_suprematist_planes
+        ArtPattern.CALATRAVA_RIBS -> R.drawable.pattern_preview_calatrava_ribs
+        ArtPattern.HEXAGONAL_BASALT -> R.drawable.pattern_preview_hexagonal_basalt
+        ArtPattern.METABOLIST_CAPSULES -> R.drawable.pattern_preview_metabolist_capsules
+        ArtPattern.DIAGRID_SKYSCRAPER -> R.drawable.pattern_preview_diagrid_skyscraper
 
         ArtPattern.CRYSTAL_VORONOI -> R.drawable.pattern_preview_crystal_voronoi
         ArtPattern.PENROSE_QUASICRYSTAL -> R.drawable.pattern_preview_penrose_quasicrystal
@@ -234,4 +278,8 @@ val ArtPattern.previewRes: Int
         ArtPattern.ARCHIMEDEAN_SNUB -> R.drawable.pattern_preview_archimedean_snub
         ArtPattern.AMMANN_QUASICRYSTAL -> R.drawable.pattern_preview_ammann_quasicrystal
         ArtPattern.PYTHAGORAS_CANOPY -> R.drawable.pattern_preview_pythagoras_canopy
+        ArtPattern.LAVES_FLORET -> R.drawable.pattern_preview_laves_floret
+        ArtPattern.KITE_DART_STAR -> R.drawable.pattern_preview_kite_dart_star
+        ArtPattern.TRIANGULAR_GYROID -> R.drawable.pattern_preview_triangular_gyroid
+        ArtPattern.GOSPER_FLOWSNAKE -> R.drawable.pattern_preview_gosper_flowsnake
     }

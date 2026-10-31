@@ -7,12 +7,18 @@ import com.example.engine.CoreGenerationSpec
 import com.example.engine.DeepBlackRatioEngine
 import com.example.engine.PaletteMode
 import com.example.engine.PatternCategory
+import com.example.engine.PatternWeightMode
 import com.example.engine.PitchBlackMode
+import com.example.engine.PolygonPrimitive
+import com.example.engine.PolylineRibbonPrimitive
+import com.example.engine.ArcSectorPrimitive
 import com.example.engine.RandomPaletteGenerator
 import com.example.engine.StarterPalettes
+import com.example.engine.VectorPrimitive
 import com.example.engine.WallpaperGeneratorEngine
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,7 +53,7 @@ class CoreEnginePortabilityTest {
             ?.sortedBy { it.name }
             .orEmpty()
 
-        assertTrue("Expected at least 15 pure Kotlin files in engine/, found ${ktFiles.size}", ktFiles.size >= 15)
+        assertTrue("Expected at least 17 pure Kotlin files in engine/, found ${ktFiles.size}", ktFiles.size >= 17)
 
         val forbiddenImportPrefixes = listOf(
             "android.",
@@ -132,9 +138,9 @@ class CoreEnginePortabilityTest {
     }
 
     @Test
-    fun pureJvm_wallpaperGeneratorEngine_synthesizesAll64PatternsWithAccurateAnalyticalBlackRatios() {
+    fun pureJvm_wallpaperGeneratorEngine_synthesizesAll80PatternsWithAccurateAnalyticalBlackRatios() {
         assertEquals(4, PatternCategory.entries.size)
-        assertEquals(64, ArtPattern.entries.size)
+        assertEquals(80, ArtPattern.entries.size)
         assertEquals(40, StarterPalettes.defaults.size)
 
         val targetRatios = floatArrayOf(0.25f, 0.60f, 0.85f)
@@ -184,6 +190,128 @@ class CoreEnginePortabilityTest {
         assertTrue(
             "Analytical True Black ratio deviations:\n${deviations.joinToString("\n")}",
             deviations.isEmpty()
+        )
+    }
+
+    @Test
+    fun pureJvm_centerWeightedMode_clumpsGeometryTowardCenterAndPreservesAnalyticalBlackRatioAcrossAll80Patterns() {
+        val aspect = 2.15f
+        val cx = 0.5f
+        val cy = aspect * 0.5f
+        val deviations = ArrayList<String>()
+        var totalNormalRadius = 0.0
+        var totalCenterWeightedRadius = 0.0
+        var closerCount = 0
+
+        fun primitiveNormalizedCenterDistance(prim: VectorPrimitive): Float {
+            val (px, py) = when (prim) {
+                is PolygonPrimitive -> {
+                    var sx = 0f
+                    var sy = 0f
+                    for (pt in prim.vertices) {
+                        sx += pt.x
+                        sy += pt.y
+                    }
+                    val inv = 1f / prim.vertices.size.coerceAtLeast(1)
+                    (sx * inv) to (sy * inv)
+                }
+                is ArcSectorPrimitive -> {
+                    val midR = (prim.innerRadius + prim.outerRadius) * 0.5f
+                    val midRad = ((prim.startAngleDeg + prim.sweepAngleDeg * 0.5f) * (kotlin.math.PI / 180.0)).toFloat()
+                    (prim.center.x + kotlin.math.cos(midRad) * midR) to (prim.center.y + kotlin.math.sin(midRad) * midR)
+                }
+                is PolylineRibbonPrimitive -> {
+                    var sx = 0f
+                    var sy = 0f
+                    for (pt in prim.points) {
+                        sx += pt.x
+                        sy += pt.y
+                    }
+                    val inv = 1f / prim.points.size.coerceAtLeast(1)
+                    (sx * inv) to (sy * inv)
+                }
+            }
+            val dx = (px - cx) / 0.5f
+            val dy = (py - cy) / (aspect * 0.5f)
+            return hypot(dx, dy)
+        }
+
+        for (pattern in ArtPattern.entries) {
+            val seed = 410_017L + pattern.ordinal * 8_191L
+            val normalSynth = WallpaperGeneratorEngine.synthesize(
+                seed = seed,
+                spec = CoreGenerationSpec(
+                    patternsRandomized = false,
+                    selectedPatterns = setOf(pattern),
+                    patternWeightMode = PatternWeightMode.NORMAL,
+                    pitchBlackMode = PitchBlackMode.SINGLE,
+                    pitchBlackRatio = 0.80f
+                ),
+                aspectRatio = aspect
+            )
+            val centerSynth = WallpaperGeneratorEngine.synthesize(
+                seed = seed,
+                spec = CoreGenerationSpec(
+                    patternsRandomized = false,
+                    selectedPatterns = setOf(pattern),
+                    patternWeightMode = PatternWeightMode.CENTER_WEIGHTED,
+                    pitchBlackMode = PitchBlackMode.SINGLE,
+                    pitchBlackRatio = 0.80f
+                ),
+                aspectRatio = aspect
+            )
+
+            assertEquals(PatternWeightMode.NORMAL, normalSynth.patternWeightMode)
+            assertEquals(PatternWeightMode.CENTER_WEIGHTED, centerSynth.patternWeightMode)
+
+            var prevPct = -1
+            for (ratio in floatArrayOf(0.25f, 0.60f, 0.85f)) {
+                val stats = centerSynth.scene.computeStats(ratio)
+                val expected = (ratio * 100f).toInt()
+                if (abs(stats.pitchBlackPercent - expected) > 5) {
+                    deviations.add("${pattern.id}(CENTER_WEIGHTED): target=$expected% analytical=${stats.pitchBlackPercent}%")
+                }
+                if (stats.pitchBlackPercent <= prevPct) {
+                    deviations.add("${pattern.id}(CENTER_WEIGHTED): non-monotonic ${stats.pitchBlackPercent}% <= $prevPct%")
+                }
+                prevPct = stats.pitchBlackPercent
+            }
+
+            fun weightedMeanRadius(scenePrimitives: List<VectorPrimitive>, blackRatio: Float): Double {
+                var wSum = 0.0
+                var rSum = 0.0
+                for (p in scenePrimitives) {
+                    if (DeepBlackRatioEngine.isPrimitiveVisible(p, blackRatio)) {
+                        val w = p.areaWeight.toDouble().coerceAtLeast(1e-6)
+                        wSum += w
+                        rSum += w * primitiveNormalizedCenterDistance(p)
+                    }
+                }
+                return if (wSum > 0.0) rSum / wSum else 0.0
+            }
+
+            val normR = weightedMeanRadius(normalSynth.scene.primitives, 0.80f)
+            val centR = weightedMeanRadius(centerSynth.scene.primitives, 0.80f)
+            totalNormalRadius += normR
+            totalCenterWeightedRadius += centR
+            if (centR <= normR + 0.03) {
+                closerCount += 1
+            }
+        }
+
+        assertTrue(
+            "Center-weighted analytical ratio deviations:\n${deviations.joinToString("\n")}",
+            deviations.isEmpty()
+        )
+        val meanNormal = totalNormalRadius / ArtPattern.entries.size
+        val meanCenter = totalCenterWeightedRadius / ArtPattern.entries.size
+        assertTrue(
+            "Expected CENTER_WEIGHTED mean radial distance ($meanCenter) to be substantially smaller than NORMAL ($meanNormal)",
+            meanCenter < meanNormal * 0.72
+        )
+        assertTrue(
+            "Expected vast majority of 80 patterns ($closerCount/80) to cluster closer to center in CENTER_WEIGHTED mode",
+            closerCount >= 72
         )
     }
 

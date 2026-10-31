@@ -17,6 +17,7 @@ import com.example.model.ColorPalette
 import com.example.model.GeneratedHistoryItem
 import com.example.model.GeneratorConfig
 import com.example.model.PaletteMode
+import com.example.model.PatternWeightMode
 import com.example.model.PitchBlackMode
 import com.example.model.StarterPalettes
 import com.example.model.WallpaperTarget
@@ -51,6 +52,7 @@ data class StoredWallpaperState(
     val config: GeneratorConfig = GeneratorConfig(),
     val currentSeed: Long = 0L,
     val currentPattern: ArtPattern? = null,
+    val currentPatternWeightMode: PatternWeightMode? = null,
     val currentColors: List<Long> = emptyList(),
     val currentPitchBlackRatio: Float? = null,
     val currentIntricacy: Float? = null,
@@ -64,6 +66,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
     private object Keys {
         val PATTERNS_RANDOMIZED = booleanPreferencesKey("patterns_randomized")
         val SELECTED_PATTERNS = stringPreferencesKey("selected_patterns")
+        val PATTERN_WEIGHT_MODE = stringPreferencesKey("pattern_weight_mode")
         val COLOR_FILL_MODE = stringPreferencesKey("color_fill_mode")
         val PALETTE_MODE = stringPreferencesKey("palette_mode")
         val SELECTED_PALETTE_IDS = stringPreferencesKey("selected_palette_ids")
@@ -73,6 +76,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
         val PITCH_BLACK_RANGE_MAX = floatPreferencesKey("pitch_black_range_max_v2")
         val CURRENT_BLACK_RATIO = floatPreferencesKey("current_black_ratio")
         val CURRENT_INTRICACY = floatPreferencesKey("current_intricacy")
+        val CURRENT_WEIGHT_MODE = stringPreferencesKey("current_weight_mode")
         val MANUAL_TARGET = stringPreferencesKey("manual_target")
         val AUTO_ROTATE_ENABLED = booleanPreferencesKey("auto_rotate_enabled")
         val INTERVAL_MINUTES = intPreferencesKey("interval_minutes")
@@ -95,6 +99,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
             config = config,
             currentSeed = prefs[Keys.CURRENT_SEED] ?: 0L,
             currentPattern = prefs[Keys.CURRENT_PATTERN]?.let { ArtPattern.fromId(it) },
+            currentPatternWeightMode = prefs[Keys.CURRENT_WEIGHT_MODE]?.let { PatternWeightMode.fromId(it) },
             currentColors = decodeLongList(prefs[Keys.CURRENT_COLORS_JSON]),
             currentPitchBlackRatio = prefs[Keys.CURRENT_BLACK_RATIO]?.coerceIn(0f, 0.95f),
             currentIntricacy = prefs[Keys.CURRENT_INTRICACY]?.coerceIn(0.15f, 1.0f),
@@ -143,6 +148,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
                     ArtPattern.PENROSE_QUASICRYSTAL
                 )
             },
+            patternWeightMode = prefs[Keys.PATTERN_WEIGHT_MODE]?.let { PatternWeightMode.fromId(it) } ?: PatternWeightMode.NORMAL,
             colorFillMode = prefs[Keys.COLOR_FILL_MODE]?.let { ColorFillMode.fromId(it) } ?: ColorFillMode.GRADIENT,
             paletteMode = prefs[Keys.PALETTE_MODE]?.let { PaletteMode.fromId(it) } ?: PaletteMode.RANDOMIZED,
             selectedPaletteIds = parsedPaletteIds,
@@ -173,6 +179,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
 
             prefs[Keys.PATTERNS_RANDOMIZED] = updated.patternsRandomized
             prefs[Keys.SELECTED_PATTERNS] = encodePatternSet(updated.selectedPatterns)
+            prefs[Keys.PATTERN_WEIGHT_MODE] = updated.patternWeightMode.id
             prefs[Keys.COLOR_FILL_MODE] = updated.colorFillMode.id
             prefs[Keys.PALETTE_MODE] = updated.paletteMode.id
             prefs[Keys.SELECTED_PALETTE_IDS] = encodeStringSet(updated.selectedPaletteIds)
@@ -203,6 +210,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = item.seed
             prefs[Keys.CURRENT_PATTERN] = item.pattern.id
+            prefs[Keys.CURRENT_WEIGHT_MODE] = item.patternWeightMode.id
             prefs[Keys.CURRENT_COLORS_JSON] = encodeLongList(item.paletteColors)
             prefs[Keys.CURRENT_BLACK_RATIO] = item.pitchBlackRatio.coerceIn(0f, 0.95f)
             prefs[Keys.CURRENT_INTRICACY] = item.intricacy.coerceIn(0.15f, 1.0f)
@@ -224,6 +232,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = primaryItem.seed
             prefs[Keys.CURRENT_PATTERN] = primaryItem.pattern.id
+            prefs[Keys.CURRENT_WEIGHT_MODE] = primaryItem.patternWeightMode.id
             prefs[Keys.CURRENT_COLORS_JSON] = encodeLongList(primaryItem.paletteColors)
             prefs[Keys.CURRENT_BLACK_RATIO] = primaryItem.pitchBlackRatio.coerceIn(0f, 0.95f)
             prefs[Keys.CURRENT_INTRICACY] = primaryItem.intricacy.coerceIn(0.15f, 1.0f)
@@ -251,6 +260,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = current.seed
             prefs[Keys.CURRENT_PATTERN] = current.pattern.id
+            prefs[Keys.CURRENT_WEIGHT_MODE] = current.patternWeightMode.id
             prefs[Keys.CURRENT_COLORS_JSON] = encodeLongList(current.paletteColors)
             prefs[Keys.CURRENT_BLACK_RATIO] = current.pitchBlackRatio.coerceIn(0f, 0.95f)
             prefs[Keys.CURRENT_INTRICACY] = current.intricacy.coerceIn(0.15f, 1.0f)
@@ -403,6 +413,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
             obj.put("id", item.id)
             obj.put("seed", item.seed)
             obj.put("pattern", item.pattern.id)
+            obj.put("weightMode", item.patternWeightMode.id)
             obj.put("fillMode", item.colorFillMode.id)
             obj.put("colors", encodeLongList(item.paletteColors))
             obj.put("blackRatio", item.pitchBlackRatio.toDouble())
@@ -422,6 +433,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 val pattern = ArtPattern.fromId(obj.optString("pattern")) ?: ArtPattern.SILK_RIBBONS
+                val weightMode = PatternWeightMode.fromId(obj.optString("weightMode", PatternWeightMode.NORMAL.id))
                 val fillMode = ColorFillMode.fromId(obj.optString("fillMode", ColorFillMode.GRADIENT.id))
                 val colors = decodeLongList(obj.optString("colors"))
                 if (colors.isNotEmpty()) {
@@ -435,7 +447,8 @@ class WallpaperPreferencesRepository(private val context: Context) {
                             pitchBlackRatio = obj.getDouble("blackRatio").toFloat(),
                             intricacy = obj.optDouble("intricacy", 0.50).toFloat(),
                             timestampMillis = obj.getLong("ts"),
-                            wasAutoScheduled = obj.optBoolean("scheduled", false)
+                            wasAutoScheduled = obj.optBoolean("scheduled", false),
+                            patternWeightMode = weightMode
                         )
                     )
                 }

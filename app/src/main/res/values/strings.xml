@@ -25,8 +25,10 @@
     <string name="preview_pending_changes_notice">Settings updated · Swipe left for next</string>
     <string name="preview_true_black_percent">%1$d%% True Black</string>
 
-    <string name="summary_patterns_random">Random (%1$d)</string>
-    <string name="summary_patterns_selected">%1$s</string>
+    <string name="summary_patterns_random">Random (%1$d) · %2$s</string>
+    <string name="summary_patterns_selected">%1$s · %2$s</string>
+    <string name="weight_short_normal">Normal</string>
+    <string name="weight_short_center">Center Weighted</string>
     <string name="summary_palette_random">Random · %1$s</string>
     <string name="summary_palette_single">%1$s · %2$s</string>
     <string name="summary_palette_list">%1$d Palettes · %2$s</string>
@@ -46,9 +48,12 @@
     <string name="btn_back">Back</string>
     <string name="cd_navigate_back">Navigate back</string>
 
-    <!-- patterns screen (64 procedural math patterns) -->
+    <!-- patterns screen (80 procedural math patterns) -->
     <string name="patterns_title">Patterns</string>
-    <string name="patterns_subtitle">Randomize across all %1$d procedural patterns or select your favorites.</string>
+    <string name="patterns_subtitle">Choose pattern layout and randomize across all %1$d procedural patterns or select your favorites.</string>
+    <string name="label_pattern_layout">Pattern Layout</string>
+    <string name="weight_mode_normal">Normal</string>
+    <string name="weight_mode_center">Center Weighted</string>
     <string name="mode_randomized">Randomize All</string>
     <string name="mode_multiselect">Select Custom</string>
     <string name="patterns_multiselect_hint">Select custom patterns for generation (%1$d of %2$d selected)</string>
@@ -195,6 +200,40 @@
     <string name="pattern_pythagoras_canopy">Pythagoras Fractal</string>
     <string name="pattern_pythagoras_canopy_sub">Recursive right-triangle square canopy</string>
 
+    <!-- patterns #65 - #80 -->
+    <string name="pattern_clifford_attractor">Clifford Strange</string>
+    <string name="pattern_clifford_attractor_sub">Iterated trigonometric phase veil</string>
+    <string name="pattern_faraday_ripples">Faraday Standing</string>
+    <string name="pattern_faraday_ripples_sub">Parametric capillary wave lattice</string>
+    <string name="pattern_bernoulli_spirals">Spira Mirabilis</string>
+    <string name="pattern_bernoulli_spirals_sub">Dual counter-rotating equiangular arms</string>
+    <string name="pattern_soliton_trains">KdV Solitons</string>
+    <string name="pattern_soliton_trains_sub">Interacting nonlinear sech² wave pulses</string>
+    <string name="pattern_enneagram_star">Enneagram Rosette</string>
+    <string name="pattern_enneagram_star_sub">9-fold nonagonal chord &amp; petal mandala</string>
+    <string name="pattern_rhodonea_bloom">Rhodonea Curves</string>
+    <string name="pattern_rhodonea_bloom_sub">Harmonic Grandi polar petal shells</string>
+    <string name="pattern_epitrochoid_crown">Epitrochoid Crown</string>
+    <string name="pattern_epitrochoid_crown_sub">Rolling planetary orbital cusps &amp; loops</string>
+    <string name="pattern_sri_yantra_triangles">Yantra Interlace</string>
+    <string name="pattern_sri_yantra_triangles_sub">Interlocking sacred triangles &amp; lotus</string>
+    <string name="pattern_calatrava_ribs">Vaulted Parabolas</string>
+    <string name="pattern_calatrava_ribs_sub">Sweeping parabolic rib-arch colonnade</string>
+    <string name="pattern_hexagonal_basalt">Basalt Columns</string>
+    <string name="pattern_hexagonal_basalt_sub">Axonometric stepped hexagonal pillars</string>
+    <string name="pattern_metabolist_capsules">Capsule Towers</string>
+    <string name="pattern_metabolist_capsules_sub">Modular cantilevered oculus pods</string>
+    <string name="pattern_diagrid_skyscraper">Diagrid Atrium</string>
+    <string name="pattern_diagrid_skyscraper_sub">Tapered structural diamond exoskeleton</string>
+    <string name="pattern_laves_floret">Floret Pentagons</string>
+    <string name="pattern_laves_floret_sub">6-fold chiral Laves pentagonal rosettes</string>
+    <string name="pattern_kite_dart_star">Decagonal Stars</string>
+    <string name="pattern_kite_dart_star_sub">5-fold golden kite &amp; dart sunburst tiling</string>
+    <string name="pattern_triangular_gyroid">Triangular Bevels</string>
+    <string name="pattern_triangular_gyroid_sub">3-way isometric cube-corner lattice</string>
+    <string name="pattern_gosper_flowsnake">Gosper Island</string>
+    <string name="pattern_gosper_flowsnake_sub">Hexagonal recursive Peano-Gosper tiles</string>
+
     <!-- palettes screen & solid/gradient option -->
     <string name="palettes_title">Colors</string>
     <string name="palettes_subtitle">Choose fill style and select active color palettes for generation.</string>
@@ -333,11 +372,11 @@
 
     <string name="dialog_send_thanks_title">Send a Thanks</string>
     <string name="dialog_send_thanks_sub">No perks, no unlocked features, and no roadmap promises—just a simple tip jar if you feel like dropping a quick thank you.</string>
-    <string name="tip_1_usd">$1 USD</string>
-    <string name="tip_3_usd">$3 USD</string>
-    <string name="tip_5_usd">$5 USD</string>
-    <string name="tip_10_usd">$10 USD</string>
-    <string name="tip_20_usd">$20 USD</string>
+    <string name="tip_1_usd">$1</string>
+    <string name="tip_3_usd">$3</string>
+    <string name="tip_5_usd">$5</string>
+    <string name="tip_10_usd">$10</string>
+    <string name="tip_20_usd">$20</string>
     <string name="msg_rating_launched">Opening Play Store for rating…</string>
     <string name="msg_thanks_sent">Thank you so much for sending a %1$s thanks! Your support means the world.</string>
 </resources>

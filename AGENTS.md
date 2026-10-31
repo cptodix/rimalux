@@ -11,7 +11,7 @@ For deep-dive cross-platform porting equations and module maps, also read [`docs
 - **App Name**: `Rimalux` (must remain synced between `metadata.json` and `app/src/main/res/values/strings.xml`).
 - **Namespace / Package Root**: `com.example` (do **NOT** rename `com/example` directories or `namespace = "com.example"` in `app/build.gradle.kts`).
 - **Application ID**: `com.aistudio.rimaluxwallpaper.qrxvmn` (do **NOT** change unless explicitly instructed).
-- **Core Purpose**: Procedural mathematical vector wallpaper studio engineered specifically for OLED displays, guaranteeing an exact user-selected `#000000` True Black Ratio (`0%–95%`, default `85%`) across **64 procedural math patterns**, **40 curated non-black palettes**, **8 HSV color-theory random harmonies**, lossless PNG export/share, and resilient background auto-change.
+- **Core Purpose**: Procedural mathematical vector wallpaper studio engineered specifically for OLED displays, guaranteeing an exact user-selected `#000000` True Black Ratio (`0%–95%`, default `85%`) across **80 procedural math patterns**, **Normal & Center Weighted** layout modes, **40 curated non-black palettes**, **8 HSV color-theory random harmonies**, lossless PNG export/share, and resilient background auto-change.
 
 ---
 
@@ -31,11 +31,11 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
    - **Automated Enforcement**: `CoreEnginePortabilityTest` scans every `.kt` file in `engine/` on the bare JVM and fails the test suite if any forbidden import or inline reference is introduced.
    - **Key Core Entry Points**:
      - `WallpaperGeneratorEngine`: High-level portable synthesis facade (`synthesize`, `synthesizeFromParameters`, `synthesizeDistinctPair`, `sampleIntricacy`, `nextDistinctSeed`).
-     - `MathPatternGenerator` + `SculptField` + 9 `*Patterns.kt` suites: Generates all 64 procedural patterns in normalized Euclidean coordinates `[0, 1] x [0, aspectRatio]`.
-     - `CoverageCalibrator`: 2D rasterized coverage mask (`GRID_W = 200`) + gapless faceted underlay mosaic that calibrates each primitive's `threshold` and `areaWeight`.
+     - `MathPatternGenerator` + `SculptField` + 11 `*Patterns.kt` suites: Generates all 80 procedural patterns in normalized Euclidean coordinates `[0, 1] x [0, aspectRatio]` with `PatternWeightMode` (`NORMAL` / `CENTER_WEIGHTED`).
+     - `CoverageCalibrator`: 2D rasterized coverage mask (`GRID_W = 200`) + center-outward priority ranking & gapless faceted underlay mosaic that calibrates each primitive's `threshold` and `areaWeight`.
      - `DeepBlackRatioEngine`: Single/range target black ratio resolution, `isPrimitiveVisible`, analytical `SceneRatioStats`, pure pixel-grid `#000000` sampler (`measureTrueBlackPercentage`), `clampDimensionsToMaxAxis`, and `computeViewportTransform`.
      - `ColorHarmonyEngine` & `RandomPaletteGenerator`: Pure HSV-to-ARGB math, non-black OLED shading floor, linear gradient endpoint math (`computeLinearGradient`), and deterministic palette selection.
-     - `WallpaperCoreModels`: `PatternCategory`, `ArtPattern` (with portable `defaultTitle` & `defaultSubtitle`), `ColorFillMode`, `PaletteMode`, `PitchBlackMode`, `ColorPalette`, `StarterPalettes`, `CoreGenerationSpec`, `SynthesizedWallpaper`.
+     - `WallpaperCoreModels`: `PatternCategory`, `ArtPattern` (with portable `defaultTitle` & `defaultSubtitle`), `PatternWeightMode`, `ColorFillMode`, `PaletteMode`, `PitchBlackMode`, `ColorPalette`, `StarterPalettes`, `CoreGenerationSpec`, `SynthesizedWallpaper`.
 
 2. **`com.example.platform` (`app/src/main/java/com/example/platform/`) — ANDROID GRAPHICS & OS ADAPTERS**
    - `WallpaperRenderer.kt`: Rasterizes `VectorScene` onto `android.graphics.Bitmap`, measures rendered `#000000` percentage via `DeepBlackRatioEngine.measureTrueBlackPercentage`, queries `WindowManager` display metrics, and applies wallpapers via `WallpaperManager` (`HOME`, `LOCK`, `BOTH`, `BOTH_SEPARATE`).
@@ -62,7 +62,7 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
 1. **Exact `#000000` True Black Calibration**:
    - Every pattern generator returns `List<DraftCell>` and **MUST** pass through `CoverageCalibrator.calibrate(...)`.
    - Visibility rule: a `VectorPrimitive` is drawn iff `primitive.threshold >= clampedBlackRatio`.
-   - Measured rendered `#000000` pixels (`(argb and 0x00FFFFFF) == 0`) must stay within `±7%` of target across `[25%, 65%, 85%]` and increase monotonically with target black ratio across all 64 patterns.
+   - Measured rendered `#000000` pixels (`(argb and 0x00FFFFFF) == 0`) must stay within `±7%` of target across `[25%, 65%, 85%]` and increase monotonically with target black ratio across all 80 patterns in both `NORMAL` and `CENTER_WEIGHTED` modes.
 2. **Non-Black Palette & Shading Floor**:
    - Starter palettes and `RandomPaletteGenerator` must **never** include `#000000`.
    - `ColorHarmonyEngine.resolveArgbColor` clamps any non-black swatch that rounds to `(0, 0, 0)` under dark shading up to `(0, 0, 4)` (`0xFF000004L`) so colored geometry is never miscounted as `#000000` OLED void.
@@ -131,6 +131,6 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
 
 Run sequentially after changes:
 1. `gradle :app:testDebugUnitTest --console=plain`
-   - `CoreEnginePortabilityTest`: Verifies 0 Android/Compose/app imports in `engine/` + pure-JVM synthesis of all 64 patterns.
-   - `WallpaperEngineAndAutoScheduleTest`: Verifies pixel-level `#000000` calibration across all 64 patterns, QHD+/4K clamping, foreground/background auto-change, Force-Close & reboot recovery, and 3-way race / Doze deduplication.
-   - `ExampleRobolectricTest`: Verifies full Compose UI journeys, swipe deck, bottom sheet flick physics, pattern/color screens, WCAG contrast, lossless PNG save/share, and OEM troubleshooting shortcuts.
+   - `CoreEnginePortabilityTest`: Verifies 0 Android/Compose/app imports in `engine/` + pure-JVM synthesis of all 80 patterns across `NORMAL` and `CENTER_WEIGHTED` modes.
+   - `WallpaperEngineAndAutoScheduleTest`: Verifies pixel-level `#000000` calibration across all 80 patterns + Center Weighted side-margin emptiness, QHD+/4K clamping, foreground/background auto-change, Force-Close & reboot recovery, and 3-way race / Doze deduplication.
+   - `ExampleRobolectricTest`: Verifies full Compose UI journeys, swipe deck, bottom sheet flick physics, pattern layout & color screens, WCAG contrast, lossless PNG save/share, and OEM troubleshooting shortcuts.
