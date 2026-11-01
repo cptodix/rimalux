@@ -114,7 +114,10 @@ data class RimaluxUiState(
     val isCustomIntervalDialogOpen: Boolean = false,
     val isBottomSheetOpen: Boolean = false,
     val isLikeAppDialogOpen: Boolean = false,
-    val isSendThanksDialogOpen: Boolean = false
+    val isSendThanksDialogOpen: Boolean = false,
+    val isPatternLayoutDialogOpen: Boolean = false,
+    val isColorFillDialogOpen: Boolean = false,
+    val isGestureTutorialVisible: Boolean = false
 )
 
 class RimaluxViewModel(
@@ -147,6 +150,8 @@ class RimaluxViewModel(
 
     private var hasInitializedFromStorage = false
     private var hasVerifiedInitialSchedule = false
+    private var hasDismissedTutorialThisSession = false
+    private var tutorialShownTimestampMs = 0L
     private var lastObservedAutoExecMillis = 0L
     private var isExecutingScheduledTick = false
     private var pendingRandomColors: List<Long>? = null
@@ -178,12 +183,18 @@ class RimaluxViewModel(
                             .forEach { pastStack.addLast(it) }
                     }
 
+                    val showInitialTutorial = !stored.hasSeenGestureTutorial && !hasDismissedTutorialThisSession
+                    if (showInitialTutorial) {
+                        tutorialShownTimestampMs = System.currentTimeMillis()
+                    }
+
                     _uiState.update { state ->
                         state.copy(
                             config = stored.config,
                             userPalettes = stored.userPalettes,
                             history = stored.history,
-                            canSwipeRight = pastStack.isNotEmpty()
+                            canSwipeRight = pastStack.isNotEmpty(),
+                            isGestureTutorialVisible = showInitialTutorial
                         )
                     }
 
@@ -506,6 +517,7 @@ class RimaluxViewModel(
      * (or switches to the pitch-black loading slot if the user swiped faster than background synthesis).
      */
     fun swipeLeftToNextWallpaper(): Boolean {
+        dismissGestureTutorial()
         val currentSnapshot = _uiState.value
         val active = currentSnapshot.preview
         if (active == null && currentSnapshot.isGeneratingPreview) {
@@ -573,6 +585,7 @@ class RimaluxViewModel(
      * Returns false (and records a bounce) if there are no more recent wallpapers.
      */
     fun swipeRightToPreviousWallpaper(): Boolean {
+        dismissGestureTutorial()
         val prevItem = pastStack.removeLastOrNull()
         if (prevItem == null) {
             recordRightEdgeBounce()
@@ -672,6 +685,7 @@ class RimaluxViewModel(
     }
 
     fun recordRightEdgeBounce() {
+        dismissGestureTutorial()
         _uiState.update { it.copy(rightEdgeBounceCount = it.rightEdgeBounceCount + 1) }
     }
 
@@ -794,10 +808,62 @@ class RimaluxViewModel(
     }
 
     fun setBottomSheetOpen(isOpen: Boolean) {
+        if (isOpen) {
+            dismissGestureTutorial()
+        }
         _uiState.update { it.copy(isBottomSheetOpen = isOpen) }
     }
 
+    fun dismissGestureTutorial(force: Boolean = false) {
+        if (!force && _uiState.value.isGestureTutorialVisible) {
+            val elapsed = System.currentTimeMillis() - tutorialShownTimestampMs
+            if (elapsed < 800L) {
+                return
+            }
+        }
+        val shouldPersist = !hasDismissedTutorialThisSession || _uiState.value.isGestureTutorialVisible
+        hasDismissedTutorialThisSession = true
+        if (_uiState.value.isGestureTutorialVisible) {
+            _uiState.update { it.copy(isGestureTutorialVisible = false) }
+        }
+        if (shouldPersist) {
+            viewModelScope.launch {
+                repository.setGestureTutorialSeen(true)
+            }
+        }
+    }
+
+    fun onCanvasSingleTap() {
+        val current = _uiState.value
+        if (current.isBottomSheetOpen || current.isSetWallpaperDialogOpen) return
+        if (current.isGestureTutorialVisible) {
+            dismissGestureTutorial()
+        } else {
+            hasDismissedTutorialThisSession = true
+            tutorialShownTimestampMs = System.currentTimeMillis()
+            _uiState.update { it.copy(isGestureTutorialVisible = true) }
+            viewModelScope.launch {
+                repository.setGestureTutorialSeen(true)
+            }
+        }
+    }
+
+    fun reopenGestureTutorial() {
+        hasDismissedTutorialThisSession = true
+        tutorialShownTimestampMs = System.currentTimeMillis()
+        _uiState.update {
+            it.copy(
+                isBottomSheetOpen = false,
+                isGestureTutorialVisible = true
+            )
+        }
+        viewModelScope.launch {
+            repository.setGestureTutorialSeen(true)
+        }
+    }
+
     fun cycleMockupOverlay() {
+        dismissGestureTutorial()
         _uiState.update { state ->
             val nextMode = when (state.mockupMode) {
                 MockupOverlayMode.NONE -> MockupOverlayMode.LOCK_SCREEN
@@ -817,6 +883,7 @@ class RimaluxViewModel(
     }
 
     fun openSetWallpaperDialog() {
+        dismissGestureTutorial()
         val current = _uiState.value
         if (current.preview == null || current.isApplyingWallpaper || current.isExportingWallpaper) return
         _uiState.update { it.copy(isSetWallpaperDialogOpen = true) }
@@ -1067,15 +1134,23 @@ class RimaluxViewModel(
 
     // --- Procedural Pattern Controls (Rebuilds ahead queue for next swipe-left) ---
     fun setPatternWeightMode(weightMode: PatternWeightMode) {
-        if (_uiState.value.config.patternWeightMode == weightMode) return
+        if (_uiState.value.config.patternWeightMode == weightMode) {
+            _uiState.update { it.copy(isPatternLayoutDialogOpen = false) }
+            return
+        }
         _uiState.update { state ->
             state.copy(
+                isPatternLayoutDialogOpen = false,
                 config = state.config.copy(patternWeightMode = weightMode),
                 hasUnappliedChanges = true
             )
         }
         persistConfigChanges(debounceMs = 0L)
         invalidateAheadAndPrefetch(debounceMs = 0L)
+    }
+
+    fun setPatternLayoutDialogOpen(open: Boolean) {
+        _uiState.update { it.copy(isPatternLayoutDialogOpen = open) }
     }
 
     fun setPatternsRandomized(randomized: Boolean) {
@@ -1146,15 +1221,23 @@ class RimaluxViewModel(
 
     // --- Solid vs Gradient & Palette Controls (Rebuilds ahead queue for next swipe-left) ---
     fun setColorFillMode(fillMode: ColorFillMode) {
-        if (_uiState.value.config.colorFillMode == fillMode) return
+        if (_uiState.value.config.colorFillMode == fillMode) {
+            _uiState.update { it.copy(isColorFillDialogOpen = false) }
+            return
+        }
         _uiState.update { state ->
             state.copy(
+                isColorFillDialogOpen = false,
                 config = state.config.copy(colorFillMode = fillMode),
                 hasUnappliedChanges = true
             )
         }
         persistConfigChanges(debounceMs = 0L)
         invalidateAheadAndPrefetch(debounceMs = 0L)
+    }
+
+    fun setColorFillDialogOpen(open: Boolean) {
+        _uiState.update { it.copy(isColorFillDialogOpen = open) }
     }
 
     fun setPaletteMode(mode: PaletteMode) {
@@ -1380,7 +1463,12 @@ class RimaluxViewModel(
             } else {
                 WallpaperScheduler.cancelAll(appContext)
                 _uiState.update {
-                    it.copy(config = it.config.copy(autoRotateEnabled = false, nextRunEpochMillis = 0L))
+                    it.copy(
+                        isAutoTargetDialogOpen = false,
+                        isIntervalDialogOpen = false,
+                        isCustomIntervalDialogOpen = false,
+                        config = it.config.copy(autoRotateEnabled = false, nextRunEpochMillis = 0L)
+                    )
                 }
                 repository.updateConfig {
                     it.copy(autoRotateEnabled = false, nextRunEpochMillis = 0L)
@@ -1427,10 +1515,12 @@ class RimaluxViewModel(
     }
 
     fun setAutoTargetDialogOpen(open: Boolean) {
+        if (open && !_uiState.value.config.autoRotateEnabled) return
         _uiState.update { it.copy(isAutoTargetDialogOpen = open) }
     }
 
     fun setIntervalDialogOpen(open: Boolean) {
+        if (open && !_uiState.value.config.autoRotateEnabled) return
         _uiState.update { it.copy(isIntervalDialogOpen = open) }
     }
 

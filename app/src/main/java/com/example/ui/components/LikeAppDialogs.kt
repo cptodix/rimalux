@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +19,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,10 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.example.R
 
 @Composable
@@ -48,29 +46,23 @@ fun LikeAppDialog(
     val colorScheme = MaterialTheme.colorScheme
     val shapes = MaterialTheme.shapes
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = shapes.extraLarge,
-            color = colorScheme.surfaceContainerHigh,
-            tonalElevation = 0.dp,
-            border = BorderStroke(
-                width = 1.dp,
-                color = colorScheme.outlineVariant.copy(alpha = 0.45f)
-            ),
-            modifier = modifier
-                .widthIn(max = 380.dp)
+    RimaluxModalDialog(
+        dialogTestTag = "dialog_like_app",
+        onDismiss = onDismiss,
+        modifier = modifier,
+        maxWidth = 380.dp,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
                 .fillMaxWidth()
-                .testTag("dialog_like_app")
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Surface(
-                    shape = CircleShape,
+            Surface(
+                shape = CircleShape,
                     color = colorScheme.primaryContainer,
                     modifier = Modifier.size(48.dp)
                 ) {
@@ -89,8 +81,7 @@ fun LikeAppDialog(
 
                 Text(
                     text = stringResource(R.string.dialog_like_app_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleLarge,
                     color = colorScheme.onSurface
                 )
 
@@ -107,7 +98,7 @@ fun LikeAppDialog(
                 ) {
                     Button(
                         onClick = onRateApp,
-                        shape = CircleShape,
+                        shape = shapes.medium,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp)
@@ -122,13 +113,13 @@ fun LikeAppDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.btn_rate_app),
-                            style = MaterialTheme.typography.titleSmall
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
 
                     FilledTonalButton(
                         onClick = onOpenSendThanks,
-                        shape = CircleShape,
+                        shape = shapes.medium,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp)
@@ -143,13 +134,16 @@ fun LikeAppDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.btn_send_thanks),
-                            style = MaterialTheme.typography.titleSmall
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
 
                     TextButton(
                         onClick = onDismiss,
-                        shape = CircleShape,
+                        shape = shapes.small,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = colorScheme.onSurfaceVariant
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
@@ -158,13 +152,11 @@ fun LikeAppDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.btn_cancel),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
                 }
             }
-        }
     }
 }
 
@@ -190,29 +182,23 @@ fun SendThanksDialog(
     val colorScheme = MaterialTheme.colorScheme
     val shapes = MaterialTheme.shapes
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = shapes.extraLarge,
-            color = colorScheme.surfaceContainerHigh,
-            tonalElevation = 0.dp,
-            border = BorderStroke(
-                width = 1.dp,
-                color = colorScheme.outlineVariant.copy(alpha = 0.45f)
-            ),
-            modifier = modifier
-                .widthIn(max = 380.dp)
+    RimaluxModalDialog(
+        dialogTestTag = "dialog_send_thanks",
+        onDismiss = onDismiss,
+        modifier = modifier,
+        maxWidth = 380.dp,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
                 .fillMaxWidth()
-                .testTag("dialog_send_thanks")
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Surface(
-                    shape = CircleShape,
+            Surface(
+                shape = CircleShape,
                     color = colorScheme.tertiaryContainer,
                     modifier = Modifier.size(48.dp)
                 ) {
@@ -231,8 +217,7 @@ fun SendThanksDialog(
 
                 Text(
                     text = stringResource(R.string.dialog_send_thanks_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleLarge,
                     color = colorScheme.onSurface
                 )
 
@@ -243,7 +228,7 @@ fun SendThanksDialog(
                     textAlign = TextAlign.Center
                 )
 
-                // Single-column direct-action tip buttons ($1, $3, $5, $10, $20 USD)
+                // Single-column direct-action tip buttons ($1, $3, $5, $10, $20)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -257,8 +242,8 @@ fun SendThanksDialog(
                             shape = shapes.medium,
                             color = colorScheme.surfaceContainerHighest,
                             border = BorderStroke(
-                                width = 1.dp,
-                                color = colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                width = 0.75.dp,
+                                color = colorScheme.outlineVariant.copy(alpha = 0.42f)
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -275,14 +260,13 @@ fun SendThanksDialog(
                             ) {
                                 Text(
                                     text = tipLabel,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.titleSmall,
                                     color = colorScheme.onSurface
                                 )
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                                     contentDescription = null,
-                                    tint = colorScheme.primary,
+                                    tint = colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -292,7 +276,10 @@ fun SendThanksDialog(
 
                 TextButton(
                     onClick = onDismiss,
-                    shape = CircleShape,
+                    shape = shapes.small,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = colorScheme.onSurfaceVariant
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
@@ -301,11 +288,9 @@ fun SendThanksDialog(
                 ) {
                     Text(
                         text = stringResource(R.string.btn_cancel),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
             }
-        }
     }
 }

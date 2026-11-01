@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -93,7 +95,7 @@ fun CustomPaletteSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = BottomSheetDefaults.ExpandedShape,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
         dragHandle = { BottomSheetDefaults.DragHandle() }
@@ -108,7 +110,7 @@ fun CustomPaletteSheet(
         ) {
             Text(
                 text = stringResource(R.string.sheet_create_palette_title),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
@@ -144,7 +146,7 @@ fun CustomPaletteSheet(
                     brightness = hsv[2]
                     hexInput = "#%06X".format(firstColor and 0xFFFFFFL)
                 },
-                shape = CircleShape,
+                shape = MaterialTheme.shapes.medium,
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -181,7 +183,10 @@ fun CustomPaletteSheet(
                                     selectedSwatchIndex = selectedSwatchIndex.coerceAtMost(swatches.lastIndex)
                                 }
                             },
-                            shape = CircleShape,
+                            shape = MaterialTheme.shapes.small,
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                             modifier = Modifier
                                 .heightIn(min = 48.dp)
@@ -190,22 +195,22 @@ fun CustomPaletteSheet(
                         ) {
                             Text(
                                 text = stringResource(R.string.btn_remove_swatch),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
 
                     if (swatches.size < 6) {
-                        FilledTonalButton(
+                        OutlinedButton(
                             onClick = {
                                 val nextHue = (hue + 65f) % 360f
                                 val nextInt = AndroidColor.HSVToColor(floatArrayOf(nextHue, 0.85f, 0.95f))
                                 swatches.add(nextInt.toLong() and 0xFFFFFFFFL)
                                 selectedSwatchIndex = swatches.lastIndex
                             },
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            shape = MaterialTheme.shapes.small,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             modifier = Modifier
                                 .heightIn(min = 48.dp)
                                 .minimumInteractiveComponentSize()
@@ -213,7 +218,7 @@ fun CustomPaletteSheet(
                         ) {
                             Text(
                                 text = stringResource(R.string.btn_add_swatch),
-                                style = MaterialTheme.typography.labelLarge
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
@@ -311,8 +316,8 @@ fun CustomPaletteSheet(
                 ) {
                     Text(
                         text = stringResource(R.string.label_hue),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "${hue.roundToInt()}°",
@@ -337,8 +342,8 @@ fun CustomPaletteSheet(
                 ) {
                     Text(
                         text = stringResource(R.string.label_saturation),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "${(saturation * 100f).roundToInt()}%",
@@ -363,8 +368,8 @@ fun CustomPaletteSheet(
                 ) {
                     Text(
                         text = stringResource(R.string.label_brightness),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "${(brightness * 100f).roundToInt()}%",
@@ -391,7 +396,10 @@ fun CustomPaletteSheet(
             ) {
                 OutlinedButton(
                     onClick = onDismiss,
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
@@ -406,7 +414,7 @@ fun CustomPaletteSheet(
                 }
                 Button(
                     onClick = { onSavePalette(paletteName, swatches.toList()) },
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.medium,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
                         .weight(1.4f)

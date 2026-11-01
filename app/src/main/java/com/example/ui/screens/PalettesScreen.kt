@@ -29,7 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -82,11 +82,10 @@ fun PalettesScreen(
     val cardSegmentedColors = SegmentedButtonDefaults.colors(
         activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
         activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        activeBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
         inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    val segmentedBorder = SegmentedButtonDefaults.borderStroke(
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        inactiveBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
     )
 
     Scaffold(
@@ -155,67 +154,6 @@ fun PalettesScreen(
                     )
                 }
 
-                // Solid Colors vs Gradients Tonal Selector Card
-                item(key = "color_shading_card") {
-                    Surface(
-                        shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.surfaceContainer
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.label_color_shading),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                                SegmentedButton(
-                                    selected = uiState.config.colorFillMode == ColorFillMode.SOLID,
-                                    onClick = { onSetColorFillMode(ColorFillMode.SOLID) },
-                                    icon = {},
-                                    colors = cardSegmentedColors,
-                                    border = segmentedBorder,
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = 0,
-                                        count = 2,
-                                        baseShape = CircleShape
-                                    ),
-                                    modifier = Modifier
-                                        .minimumInteractiveComponentSize()
-                                        .testTag("btn_fill_mode_solid")
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.fill_mode_solid),
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                }
-                                SegmentedButton(
-                                    selected = uiState.config.colorFillMode == ColorFillMode.GRADIENT,
-                                    onClick = { onSetColorFillMode(ColorFillMode.GRADIENT) },
-                                    icon = {},
-                                    colors = cardSegmentedColors,
-                                    border = segmentedBorder,
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = 1,
-                                        count = 2,
-                                        baseShape = CircleShape
-                                    ),
-                                    modifier = Modifier
-                                        .minimumInteractiveComponentSize()
-                                        .testTag("btn_fill_mode_gradient")
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.fill_mode_gradient),
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // Palette Mode Segmented Row (Randomized vs Select Palettes)
                 item(key = "palette_mode_bar") {
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -224,11 +162,10 @@ fun PalettesScreen(
                             onClick = { onSetPaletteMode(PaletteMode.RANDOMIZED) },
                             icon = {},
                             colors = cardSegmentedColors,
-                            border = segmentedBorder,
                             shape = SegmentedButtonDefaults.itemShape(
                                 index = 0,
                                 count = 2,
-                                baseShape = CircleShape
+                                baseShape = MaterialTheme.shapes.medium
                             ),
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
@@ -244,11 +181,10 @@ fun PalettesScreen(
                             onClick = { onSetPaletteMode(PaletteMode.PALETTE_LIST) },
                             icon = {},
                             colors = cardSegmentedColors,
-                            border = segmentedBorder,
                             shape = SegmentedButtonDefaults.itemShape(
                                 index = 1,
                                 count = 2,
-                                baseShape = CircleShape
+                                baseShape = MaterialTheme.shapes.medium
                             ),
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
@@ -275,22 +211,22 @@ fun PalettesScreen(
                         ) {
                             FilledTonalButton(
                                 onClick = onOpenCreatePalette,
-                                shape = CircleShape,
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                shape = MaterialTheme.shapes.medium,
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                                 modifier = Modifier
-                                    .heightIn(min = 40.dp)
+                                    .heightIn(min = 44.dp)
                                     .minimumInteractiveComponentSize()
                                     .testTag("btn_open_create_palette")
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Add,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = stringResource(R.string.btn_add_palette),
-                                    style = MaterialTheme.typography.labelMedium
+                                    style = MaterialTheme.typography.labelLarge
                                 )
                             }
                         }
@@ -314,6 +250,7 @@ fun PalettesScreen(
                             ) {
                                 TextButton(
                                     onClick = onSelectAllPalettes,
+                                    shape = MaterialTheme.shapes.small,
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .minimumInteractiveComponentSize()
@@ -326,6 +263,10 @@ fun PalettesScreen(
                                 }
                                 TextButton(
                                     onClick = onSelectNonePalettes,
+                                    shape = MaterialTheme.shapes.small,
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .minimumInteractiveComponentSize()
@@ -333,8 +274,7 @@ fun PalettesScreen(
                                 ) {
                                     Text(
                                         text = stringResource(R.string.btn_select_none),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MaterialTheme.typography.labelMedium
                                     )
                                 }
                             }
@@ -344,7 +284,8 @@ fun PalettesScreen(
 
                 items(
                     items = uiState.userPalettes,
-                    key = { it.id }
+                    key = { it.id },
+                    contentType = { "palette_item" }
                 ) { palette ->
                     val isSelected = uiState.config.paletteMode == PaletteMode.PALETTE_LIST &&
                         palette.id in uiState.config.selectedPaletteIds
@@ -381,14 +322,14 @@ private fun PaletteListItemCard(
         border = if (isSelected) {
             BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
         } else {
-            null
+            BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f))
         },
         modifier = Modifier
             .fillMaxWidth()
             .minimumInteractiveComponentSize()
             .testTag("palette_card_${palette.id}")
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -396,7 +337,7 @@ private fun PaletteListItemCard(
             ) {
                 Text(
                     text = palette.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
@@ -423,23 +364,25 @@ private fun PaletteListItemCard(
                     if (canDelete) {
                         TextButton(
                             onClick = onDelete,
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            shape = MaterialTheme.shapes.small,
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
                                 .testTag("delete_palette_${palette.id}")
                         ) {
                             Text(
                                 text = stringResource(R.string.btn_remove_palette),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             PaletteSolidSwatchesRow(colors = palette.colors)
         }
@@ -453,7 +396,7 @@ private fun PaletteSolidSwatchesRow(colors: List<Long>) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium),
+            .clip(MaterialTheme.shapes.small),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

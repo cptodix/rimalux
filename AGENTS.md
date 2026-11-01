@@ -53,7 +53,7 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
    - `WallpaperScheduler.kt`, `WallpaperRotationWorker.kt`, `WallpaperAlarmReceiver.kt`, `BootCompletedReceiver.kt`, `OemBackgroundHelper.kt`.
 
 6. **`com.example.ui` (`app/src/main/java/com/example/ui/`) — PRESENTATION & COMPOSE UI**
-   - `RimaluxViewModel.kt`, `RimaluxApp.kt`, `screens/*` (`StudioScreen`, `PatternsScreen`, `PalettesScreen`, `ScheduleScreen`, `AutoChangeHelpScreen`), `components/*` (`VectorCanvasView`, `CreatePaletteSheet`), `theme/*`.
+   - `RimaluxViewModel.kt`, `RimaluxApp.kt`, `screens/*` (`StudioScreen`, `PatternsScreen`, `PalettesScreen`, `ScheduleScreen`, `AutoChangeHelpScreen`), `components/*` (`VectorCanvasView`, `PhoneMockupOverlay`, `StudioGestureOverlay`, `RimaluxModalDialog`, `LikeAppDialogs`, `CreatePaletteSheet`), `theme/*` (`Color`, `Theme`, `Type`, `Shape`).
 
 ---
 
@@ -95,24 +95,56 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
 
 ---
 
-## 5. UI/UX, Copywriting & Accessibility Rules
+## 5. UI/UX, Material 3, Performance & Copywriting Handover Rules
 
-1. **Capitalization Policy**:
-   - Use **normal UI capitalization** throughout the entire app: Title Case for screen titles, section headers, buttons, andsegmented controls; Sentence case for subtitles, helper descriptions, and toast/status messages. (Do **not** revert to all-lowercase.)
-2. **Terminology**:
-   - Call procedural designs **"Patterns"** (never "Styles").
-   - Call the palette/shading page & nav item **"Colors"**.
-   - Call `#000000` coverage **"True Black Ratio"** (never "Pitch Black Ratio" in user-facing copy).
-   - No live countdown timer on the Auto-Change switch (removed intentionally to avoid out-of-sync display states when OS batches alarms).
-3. **OLED Dynamic Theme (`Theme.kt`)**:
+1. **Capitalization & Copywriting Policy**:
+   - Use **normal UI capitalization** throughout the entire app: **Title Case** for screen titles, modal titles, section headers, buttons, and segmented controls; **Sentence case** for subtitles, helper descriptions, and toast/status messages. (Do **not** revert to all-lowercase.)
+   - **Mandatory Terminology**:
+     - Call procedural designs **"Patterns"** (never `"Styles"`).
+     - Call the palette/shading page & navigation row **"Colors"**.
+     - Call `#000000` coverage **"True Black Ratio"** (never `"Pitch Black Ratio"` in user-facing copy).
+     - Call `WallpaperTarget.HOME` **"Home Screen"** (never `"Wallpaper"`, which creates redundant `"Apply Wallpaper To -> Wallpaper"` phrasing).
+     - Use **"Enjoying Rimalux?"** consistently on both the Studio bottom-sheet trigger (`btn_like_the_app`) and the appreciation modal title (`dialog_like_app`).
+     - Do **not** add a live countdown timer on the Auto-Change switch (omitted intentionally so OS alarm batching never causes out-of-sync countdown text).
+2. **OLED Dynamic Theme (`Theme.kt` & `Color.kt`)**:
+   - Do **not** alter `createDynamicColorScheme` color-generation math unless explicitly instructed.
    - `background` and `surface` are strictly `#000000`.
-   - Tonal containers (`surfaceContainerLow` -> `surfaceContainerHighest`) must maintain strictly monotonic luminance `< 0.03f`, and `primary` against `background`/`surfaceContainer` must maintain `>= 7.0:1` WCAG contrast.
-4. **Studio Gesture Physics**:
+   - Tonal containers (`surfaceContainerLowest` -> `surfaceContainerLow` -> `surfaceContainer` -> `surfaceContainerHigh` -> `surfaceContainerHighest`) must maintain strictly monotonic luminance `< 0.03f`, and `primary` against `background`/`surfaceContainer` must maintain `>= 7.0:1` WCAG contrast.
+3. **Medium Architectural Shape Scale (`Shape.kt`)**:
+   - Keep corner radii restrained at medium sharpness (`extraSmall = 6.dp`, `small = 8.dp`, `medium = 12.dp`, `large = 14.dp`, `extraLarge = 16.dp`) and `16.dp` top corners on sheets (`home_settings_sheet`, `CreatePaletteSheet`).
+   - **Never** revert rectangular buttons, chips, segmented controls, cards, or modals to `28.dp` or `CircleShape` pills. Reserve `CircleShape` strictly for 1:1 circular color dots, circular icon badges, and the floating sheet handle.
+4. **Material 3 Component Hierarchy & Modal Unification**:
+   - **4-Tier Action Emphasis**:
+     1. `Button` (filled primary, `shapes.medium`) for primary commits (`Save`, `Create Palette`, `Got It`, primary OEM battery shortcut).
+     2. `FilledTonalButton` (`shapes.medium`) for secondary constructive actions.
+     3. `OutlinedButton` (`shapes.medium`) for bounded utility/secondary actions (`Save to Device`, `Share`, `Open App Info`, `Enjoying Rimalux?`).
+     4. `TextButton` (`shapes.small`, `onSurfaceVariant` content color) for low-emphasis dismiss/cancel/reset actions (`Cancel`, `Remove`, `Select None`, `Not your device?`).
+   - **Tonal Surface Hierarchy**:
+     - `surfaceContainerLow`: Bottom sheets and passive informational cards (`AutoChangeHelpScreen` cards, gallery unselected cards).
+     - `surfaceContainer` + `0.5.dp` `outlineVariant` hairline border: Primary grouped control cards (`StudioScreen` main control card, `AutoChangeSection`, `Pattern Layout` / `Color Fill Style` cards).
+     - `surfaceContainerHigh` + `1.dp` `outlineVariant` border: Modal dialogs (`RimaluxModalDialog`) and selected gallery cards.
+     - `surfaceContainerHighest`: Interactive option rows and text inputs inside modals (`secondaryContainer` + `1.dp` `primary` border + `Icons.Rounded.Check` when selected).
+   - **Grouped Control Rows & Disabled Child States**:
+     - Primary settings rows (`True Black Ratio`, `Patterns`, `Colors`, `Auto-Change Wallpaper`) use `titleMedium`.
+     - Subordinate quick-popup rows inside grouped cards (`Pattern Layout`, `Color Fill Style`, `Apply To`, `Interval`) use `titleSmall` and open single-choice popups rather than inline segmented buttons.
+     - Dependent child rows (`Apply To`, `Interval`) **must** set `enabled = config.autoRotateEnabled` in addition to visual dimming (`0.55f` alpha) so disabled-looking rows are non-clickable while Auto-Change is off.
+   - **Unified Modal Container (`RimaluxModalDialog`)**:
+     - Every popup modal (`Apply Wallpaper To`, `Pattern Layout`, `Color Fill Style`, `Apply To`, `Interval` / `Custom Interval`, `Select Brand`, `Enjoying Rimalux?`, `Send a Thanks`) **must** use `RimaluxModalDialog` (`BasicAlertDialog` in `ui/components/RimaluxModalDialog.kt`) for unified window animations, focus trapping, and TalkBack announcements. Never mix raw `Dialog`, `AlertDialog`, and custom scrim `Box`es.
+   - **Adaptive Grids & Filter Chips**:
+     - Multi-column visual galleries (`PatternsScreen`) must use `LazyVerticalGrid(GridCells.Adaptive(minSize = 160.dp))` (`.widthIn(max = 920.dp)`) with stable `key` and `contentType`—never manual `chunked(2)` rows inside a `LazyColumn`.
+     - Selected `FilterChip`s must include `Icons.Rounded.Check` (`FilterChipDefaults.IconSize`) as `leadingIcon`.
+5. **Typography Hierarchy (`Type.kt`)**:
+   - All 15 Material 3 typography tokens use bundled `PlusJakartaSansFontFamily` (`res/font/plus_jakarta_sans.ttf`) with official M3 baseline weights: `FontWeight.Normal` (`400`) for `display*`, `headline*`, `titleLarge`, and `body*`; `FontWeight.Medium` (`500`) for `titleMedium`, `titleSmall`, and `label*`.
+   - Do **not** scatter ad-hoc `fontWeight = FontWeight.Bold` / `SemiBold` overrides on individual `Text` composables—express hierarchy through semantic token selection (`titleLarge` -> `titleMedium` -> `titleSmall` -> `bodyMedium` -> `bodySmall` -> `labelLarge`/`labelSmall`) and tonal color (`onSurface` vs `onSurfaceVariant` vs `primary`).
+   - Full-screen sub-pages (`PatternsScreen`, `PalettesScreen`, `AutoChangeHelpScreen`) use `LargeTopAppBar` with `TopAppBarDefaults.exitUntilCollapsedScrollBehavior`.
+6. **UI & Gesture Performance Rules**:
+   - **Defer Motion Reads to Layout/Draw Phases**: Never read continuous `Animatable` or drag-offset values directly in composition to drive animations. Gate structural composition booleans with `remember { derivedStateOf { ... } }` and apply per-frame transforms inside `Modifier.graphicsLayer { ... }` or `Modifier.offset { ... }`.
+   - **Allocation Discipline**: Memoize `ColorScheme` via `remember(seedColorHex, darkTheme)`, precompute static `Brush`es outside `Canvas`, keep off-screen swipe deck neighbors hidden (`alpha = 0f`) while stationary (`abs(offsetX) < 0.5f`), and pass `key` + `contentType` to all `LazyColumn` / `LazyVerticalGrid` items.
+7. **Studio Gesture Physics & Compose `testTag` Stability**:
    - Horizontal swipe left advances to next wallpaper (`PREFETCH_AHEAD_TARGET = 3`); swipe right restores previous (`MAX_PAST_STACK = 24`) or triggers elastic edge bounce when empty.
-   - Double-tap opens `Apply Wallpaper To` dialog (includes `Save to Device` and `Share`).
-   - Vertical swipe-up reveals the hidden settings bottom sheet (`56dp` drag threshold or `-220dp/s` upward flick velocity so casual flicks never snap back closed).
-5. **Compose `testTag` Stability**:
-   - Preserve existing `Modifier.testTag(...)` IDs (`vector_preview_canvas`, `home_bottom_sheet`, `dialog_set_wallpaper_target`, `btn_save_to_device`, `btn_share_wallpaper`, `btn_auto_change_troubleshoot`, etc.) and `>= 48.dp` minimum touch targets.
+   - Double-tap opens `Apply Wallpaper To` dialog (`Home Screen`, `Lock Screen`, `Both`, `Both (Separate)`, plus `Save to Device` and `Share`); single-tap on clean preview toggles the translucent `StudioGestureOverlay` hint; swipe-down cycles `MockupOverlayMode` (`NONE` -> `LOCK_SCREEN` -> `HOME_GRID`).
+   - Vertical swipe-up reveals the hidden settings bottom sheet.
+   - Preserve all existing `Modifier.testTag(...)` IDs and `>= 48.dp` minimum touch targets (`minimumInteractiveComponentSize()`). When testing `BasicAlertDialog` popups in Robolectric, scope ambiguous text matchers with `hasAnyAncestor(hasTestTag("dialog_..."))` because Compose tests inspect both the dialog window and underlying Studio tree.
 
 ---
 

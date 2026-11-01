@@ -7,6 +7,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
@@ -310,10 +311,10 @@ fun createDynamicColorScheme(paletteColors: List<Long>?): ColorScheme {
 
 val RimaluxShapes = Shapes(
     extraSmall = RoundedCornerShape(6.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(14.dp),
-    large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(14.dp),
+    extraLarge = RoundedCornerShape(16.dp)
 )
 
 @Composable
@@ -322,12 +323,14 @@ fun RimaluxTheme(
     darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (!paletteColors.isNullOrEmpty()) {
-        createDynamicColorScheme(paletteColors)
-    } else if (darkTheme) {
-        RimaluxDarkColorScheme
-    } else {
-        RimaluxLightColorScheme
+    val colorScheme = remember(paletteColors, darkTheme) {
+        if (!paletteColors.isNullOrEmpty()) {
+            createDynamicColorScheme(paletteColors)
+        } else if (darkTheme) {
+            RimaluxDarkColorScheme
+        } else {
+            RimaluxLightColorScheme
+        }
     }
     MaterialTheme(
         colorScheme = colorScheme,

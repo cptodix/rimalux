@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -40,7 +41,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,6 +55,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -78,6 +79,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.example.R
@@ -89,6 +91,7 @@ import com.example.model.PatternWeightMode
 import com.example.model.PitchBlackMode
 import com.example.model.titleRes
 import com.example.ui.RimaluxUiState
+import com.example.ui.components.StudioGestureOverlay
 import com.example.ui.components.SwipeableWallpaperDeck
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineStart
@@ -174,21 +177,30 @@ fun StudioScreen(
     onPitchBlackRatioChange: (Float) -> Unit,
     onPitchBlackRangeChange: (Float, Float) -> Unit,
     onOpenPatternsPage: () -> Unit,
+    onOpenPatternLayoutDialog: () -> Unit = {},
     onOpenPalettesPage: () -> Unit,
+    onOpenColorFillDialog: () -> Unit = {},
     onToggleAutoRotate: (Boolean) -> Unit,
     onOpenAutoTargetDialog: () -> Unit,
     onOpenIntervalDialog: () -> Unit,
     onOpenAutoChangeHelp: () -> Unit = {},
     onOpenLikeApp: () -> Unit = {},
+    onCanvasSingleTap: () -> Unit = {},
+    onDismissTutorial: () -> Unit = {},
+    onReopenGestureTutorial: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val weightShortLabel = when (uiState.config.patternWeightMode) {
         PatternWeightMode.NORMAL -> stringResource(R.string.weight_short_normal)
         PatternWeightMode.CENTER_WEIGHTED -> stringResource(R.string.weight_short_center)
     }
+    val weightFullLabel = when (uiState.config.patternWeightMode) {
+        PatternWeightMode.NORMAL -> stringResource(R.string.weight_mode_normal)
+        PatternWeightMode.CENTER_WEIGHTED -> stringResource(R.string.weight_mode_center)
+    }
 
     val patternsSummary = if (uiState.config.patternsRandomized) {
-        stringResource(R.string.summary_patterns_random, ArtPattern.entries.size, weightShortLabel)
+        stringResource(R.string.summary_patterns_random, ArtPattern.entries.size)
     } else {
         val names = uiState.config.selectedPatterns.take(2)
             .map { stringResource(it.titleRes).substringBefore(" ") }
@@ -196,22 +208,22 @@ fun StudioScreen(
         val suffix = if (uiState.config.selectedPatterns.size > 2) {
             " +${uiState.config.selectedPatterns.size - 2}"
         } else ""
-        stringResource(R.string.summary_patterns_selected, "$names$suffix", weightShortLabel)
+        stringResource(R.string.summary_patterns_selected, "$names$suffix")
     }
 
-    val fillShortLabel = when (uiState.config.colorFillMode) {
-        ColorFillMode.SOLID -> stringResource(R.string.fill_short_solid)
-        ColorFillMode.GRADIENT -> stringResource(R.string.fill_short_gradient)
+    val fillFullLabel = when (uiState.config.colorFillMode) {
+        ColorFillMode.SOLID -> stringResource(R.string.fill_mode_solid)
+        ColorFillMode.GRADIENT -> stringResource(R.string.fill_mode_gradient)
     }
 
     val paletteSummary = when (uiState.config.paletteMode) {
-        PaletteMode.RANDOMIZED -> stringResource(R.string.summary_palette_random, fillShortLabel)
+        PaletteMode.RANDOMIZED -> stringResource(R.string.summary_palette_random)
         PaletteMode.PALETTE_LIST -> {
             val activeList = uiState.userPalettes.filter { it.id in uiState.config.selectedPaletteIds }
             if (activeList.size == 1) {
-                stringResource(R.string.summary_palette_single, activeList.first().name, fillShortLabel)
+                stringResource(R.string.summary_palette_single, activeList.first().name)
             } else {
-                stringResource(R.string.summary_palette_list, activeList.size.coerceAtLeast(1), fillShortLabel)
+                stringResource(R.string.summary_palette_list, activeList.size.coerceAtLeast(1))
             }
         }
     }
@@ -267,7 +279,17 @@ fun StudioScreen(
         }
     }
 
-    BackHandler(enabled = sheetProgress.value > 0.02f || dragTargetProgress > 0.02f) {
+    val isSheetActiveForBack by remember {
+        derivedStateOf {
+            sheetProgress.value > 0.02f || dragTargetProgress > 0.02f
+        }
+    }
+
+    BackHandler(enabled = uiState.isGestureTutorialVisible && !isSheetActiveForBack) {
+        onDismissTutorial()
+    }
+
+    BackHandler(enabled = isSheetActiveForBack) {
         animateSheetClosed()
     }
 
@@ -355,10 +377,27 @@ fun StudioScreen(
             }
         }
 
-        val isSheetComposed = sheetProgress.value > 0.002f || dragTargetProgress > 0.002f || isDraggingSheet
+        val isSheetComposed by remember {
+            derivedStateOf {
+                sheetProgress.value > 0.002f || dragTargetProgress > 0.002f || isDraggingSheet
+            }
+        }
+        val isSheetPastHalfway by remember {
+            derivedStateOf {
+                sheetProgress.value >= 0.5f
+            }
+        }
+        var measuredInfoPillHeightPx by remember { mutableIntStateOf(0) }
+        val infoBottomOffsetDp = if (uiState.hasUnappliedChanges) 98.dp else 56.dp
+        val infoPillHeightDp = if (measuredInfoPillHeightPx > 0) {
+            with(density) { measuredInfoPillHeightPx.toDp() }
+        } else {
+            34.dp
+        }
+        val dynamicBottomOverlayClearance = navBarBottom + infoBottomOffsetDp + infoPillHeightDp + 16.dp
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // 1. Full Edge-to-Edge Interactive Swipe Deck (Left = Next/Generate, Right = Previous/Bounce, Double-Tap = Apply Popup, Swipe Down = Cycle Overlay, Swipe Up = Open Sheet)
+            // 1. Full Edge-to-Edge Interactive Swipe Deck (Left = Next/Generate, Right = Previous/Bounce, Double-Tap = Apply Popup, Single-Tap = Toggle Hint, Swipe Down = Cycle Overlay, Swipe Up = Open Sheet)
             SwipeableWallpaperDeck(
                 currentPreview = uiState.preview,
                 previousPreview = uiState.previousPreview,
@@ -366,12 +405,13 @@ fun StudioScreen(
                 canSwipeRight = uiState.canSwipeRight,
                 isGeneratingCurrent = uiState.isGeneratingPreview,
                 mockupMode = uiState.mockupMode,
-                bottomOverlayClearance = navBarBottom + 56.dp,
+                bottomOverlayClearance = dynamicBottomOverlayClearance,
                 gesturesEnabled = !isSheetComposed,
                 onSwipeLeftCommitted = onSwipeLeftNext,
                 onSwipeRightCommitted = onSwipeRightPrevious,
                 onRightEdgeBounce = onRightEdgeBounce,
                 onDoubleTap = onOpenSetWallpaperDialog,
+                onSingleTap = onCanvasSingleTap,
                 onSwipeDown = onSwipeDownCycleMockup,
                 onVerticalSwipeUpDelta = ::applyUpwardPullPx,
                 onVerticalSwipeUpEnd = ::settleVerticalPull
@@ -382,7 +422,6 @@ fun StudioScreen(
                 val previewSnapshot = uiState.preview
                 val patternTitle = stringResource(previewSnapshot.pattern.titleRes)
                 val blackPercent = (previewBlackRatio * 100f).roundToInt()
-                val bottomOffsetDp = if (uiState.hasUnappliedChanges) 98.dp else 56.dp
 
                 Box(
                     modifier = Modifier
@@ -390,14 +429,19 @@ fun StudioScreen(
                         .padding(
                             start = 20.dp,
                             end = 20.dp,
-                            bottom = navBarBottom + bottomOffsetDp
+                            bottom = navBarBottom + infoBottomOffsetDp
                         )
-                        .clip(CircleShape)
+                        .onSizeChanged { size ->
+                            if (size.height > 0) {
+                                measuredInfoPillHeightPx = size.height
+                            }
+                        }
+                        .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.72f))
                         .border(
                             width = 0.5.dp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                            shape = CircleShape
+                            shape = MaterialTheme.shapes.medium
                         )
                         .testTag("preview_info_overlay")
                 ) {
@@ -466,7 +510,7 @@ fun StudioScreen(
                             end = 24.dp,
                             bottom = navBarBottom + 56.dp
                         )
-                        .clip(CircleShape)
+                        .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f))
                         .testTag("preview_pending_notice")
                 ) {
@@ -479,19 +523,26 @@ fun StudioScreen(
                 }
             }
 
+            // Minimalist Gesture Tutorial & On-Demand Reminder Overlay (touch-passthrough except top-right Got It pill)
+            StudioGestureOverlay(
+                visible = uiState.isGestureTutorialVisible && uiState.preview != null && !isSheetComposed,
+                bottomClearance = dynamicBottomOverlayClearance,
+                onDismiss = onDismissTutorial
+            )
+
             // 3. Backdrop Scrim + Completely Hidden-When-Closed Settings Bottom Sheet
             if (isSheetComposed) {
                 val scrimDragState = rememberDraggableState { deltaY ->
                     applyUpwardPullPx(-deltaY)
                 }
+                val scrimColor = MaterialTheme.colorScheme.scrim
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            MaterialTheme.colorScheme.scrim.copy(
-                                alpha = (0.48f * sheetProgress.value).coerceIn(0f, 0.48f)
-                            )
-                        )
+                        .graphicsLayer {
+                            alpha = (0.48f * sheetProgress.value).coerceIn(0f, 0.48f)
+                        }
+                        .background(scrimColor)
                         .draggable(
                             state = scrimDragState,
                             orientation = Orientation.Vertical,
@@ -506,7 +557,7 @@ fun StudioScreen(
                 )
 
                 Surface(
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     tonalElevation = 0.dp,
                     shadowElevation = 12.dp,
@@ -542,7 +593,11 @@ fun StudioScreen(
                         // Joined Tonal Control Card (True Black Ratio, Patterns, Colors)
                         Surface(
                             shape = MaterialTheme.shapes.large,
-                            color = MaterialTheme.colorScheme.surfaceContainer
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            border = BorderStroke(
+                                width = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+                            )
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 // True Black Ratio Controls
@@ -578,7 +633,7 @@ fun StudioScreen(
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
                                                 Surface(
-                                                    shape = CircleShape,
+                                                    shape = MaterialTheme.shapes.extraSmall,
                                                     color = MaterialTheme.colorScheme.secondaryContainer
                                                 ) {
                                                     Text(
@@ -586,9 +641,9 @@ fun StudioScreen(
                                                             R.string.pitch_black_active_now,
                                                             (previewBlackRatio * 100f).roundToInt()
                                                         ),
-                                                        style = MaterialTheme.typography.labelMedium,
+                                                        style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                                     )
                                                 }
                                                 Text(
@@ -607,11 +662,10 @@ fun StudioScreen(
                                     val segmentedColors = SegmentedButtonDefaults.colors(
                                         activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                                         activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        activeBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
                                         inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    val segmentedBorder = SegmentedButtonDefaults.borderStroke(
-                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        inactiveBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
                                     )
 
                                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -620,11 +674,10 @@ fun StudioScreen(
                                             onClick = { onSetPitchBlackMode(PitchBlackMode.SINGLE) },
                                             icon = {},
                                             colors = segmentedColors,
-                                            border = segmentedBorder,
                                             shape = SegmentedButtonDefaults.itemShape(
                                                 index = 0,
                                                 count = 2,
-                                                baseShape = CircleShape
+                                                baseShape = MaterialTheme.shapes.medium
                                             ),
                                             modifier = Modifier
                                                 .minimumInteractiveComponentSize()
@@ -640,11 +693,10 @@ fun StudioScreen(
                                             onClick = { onSetPitchBlackMode(PitchBlackMode.RANGE) },
                                             icon = {},
                                             colors = segmentedColors,
-                                            border = segmentedBorder,
                                             shape = SegmentedButtonDefaults.itemShape(
                                                 index = 1,
                                                 count = 2,
-                                                baseShape = CircleShape
+                                                baseShape = MaterialTheme.shapes.medium
                                             ),
                                             modifier = Modifier
                                                 .minimumInteractiveComponentSize()
@@ -744,6 +796,57 @@ fun StudioScreen(
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
                                 )
 
+                                // Pattern Layout Popup Row (subordinate quick toggle under Patterns)
+                                Surface(
+                                    onClick = onOpenPatternLayoutDialog,
+                                    color = Color.Transparent,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 60.dp)
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("pill_open_pattern_layout")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.label_pattern_layout),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = weightFullLabel,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+                                )
+
                                 // Colors Navigation Row (1 full row, single column under Patterns)
                                 Surface(
                                     onClick = onOpenPalettesPage,
@@ -781,28 +884,63 @@ fun StudioScreen(
 
                                         Spacer(modifier = Modifier.width(12.dp))
 
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                uiState.stagedColors.take(4).forEach { argb ->
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(8.dp)
-                                                            .clip(CircleShape)
-                                                            .background(Color(argb))
-                                                    )
-                                                }
-                                            }
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
 
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(20.dp)
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+                                )
+
+                                // Color Fill Style Popup Row (subordinate quick toggle under Colors)
+                                Surface(
+                                    onClick = onOpenColorFillDialog,
+                                    color = Color.Transparent,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 60.dp)
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("pill_open_color_fill")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.label_color_shading),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = fillFullLabel,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
                                 }
                             }
@@ -817,7 +955,7 @@ fun StudioScreen(
                             onOpenAutoChangeHelp = onOpenAutoChangeHelp
                         )
 
-                        // "Like the App?" Button Card at bottom part of bottom sheet
+                        // "Enjoying Rimalux?" Button Card at bottom part of bottom sheet
                         LikeAppButtonCard(onOpenLikeApp = onOpenLikeApp)
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -825,12 +963,9 @@ fun StudioScreen(
                 }
             }
 
-            // 4. Floating Pill Handle Positioned Above the Bottom Sheet (rests near bottom edge when sheet is completely hidden)
-            val visibleSheetDp = with(density) { (sheetProgress.value * effectiveSheetHeightPx).toDp() }
-            val handleBottomPadding = maxOf(navBarBottom + 8.dp, visibleSheetDp + 8.dp)
-
+            // 4. Floating Pill Handle Positioned Above the Bottom Sheet (layout-phase offset avoids per-frame recomposition)
             FloatingBottomSheetHandle(
-                isSheetOpen = sheetProgress.value >= 0.5f,
+                isSheetOpen = isSheetPastHalfway,
                 onClick = {
                     if (sheetProgress.value >= 0.5f) {
                         animateSheetClosed()
@@ -842,7 +977,12 @@ fun StudioScreen(
                 onVerticalDragEnd = ::settleVerticalPull,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = handleBottomPadding)
+                    .padding(bottom = 8.dp)
+                    .offset {
+                        val navBarPx = navBarBottom.roundToPx()
+                        val visibleSheetPx = (sheetProgress.value * effectiveSheetHeightPx).roundToInt()
+                        IntOffset(x = 0, y = -maxOf(navBarPx, visibleSheetPx))
+                    }
             )
         }
     }
@@ -855,7 +995,11 @@ private fun LikeAppButtonCard(
     Surface(
         onClick = onOpenLikeApp,
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f),
+        border = BorderStroke(
+            width = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .minimumInteractiveComponentSize()
@@ -864,7 +1008,7 @@ private fun LikeAppButtonCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 20.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -874,22 +1018,22 @@ private fun LikeAppButtonCard(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(36.dp)
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Rounded.Favorite,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
 
                 Text(
                     text = stringResource(R.string.btn_like_the_app),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }

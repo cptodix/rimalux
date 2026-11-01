@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -43,6 +42,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
+import com.example.ui.components.ColorFillStyleDialog
+import com.example.ui.components.LikeAppDialog
+import com.example.ui.components.PatternLayoutDialog
+import com.example.ui.components.SendThanksDialog
 import com.example.ui.components.SetWallpaperTargetDialog
 import com.example.ui.screens.AutoChangeHelpScreen
 import com.example.ui.screens.AutoTargetDialog
@@ -144,12 +147,17 @@ fun RimaluxApp(
                                 onPitchBlackRatioChange = viewModel::updatePitchBlackRatio,
                                 onPitchBlackRangeChange = viewModel::updatePitchBlackRange,
                                 onOpenPatternsPage = { viewModel.navigateTo(RimaluxScreen.PATTERNS) },
+                                onOpenPatternLayoutDialog = { viewModel.setPatternLayoutDialogOpen(true) },
                                 onOpenPalettesPage = { viewModel.navigateTo(RimaluxScreen.PALETTES) },
+                                onOpenColorFillDialog = { viewModel.setColorFillDialogOpen(true) },
                                 onToggleAutoRotate = viewModel::setAutoRotateEnabled,
                                 onOpenAutoTargetDialog = { viewModel.setAutoTargetDialogOpen(true) },
                                 onOpenIntervalDialog = { viewModel.setIntervalDialogOpen(true) },
                                 onOpenAutoChangeHelp = { viewModel.navigateTo(RimaluxScreen.AUTO_CHANGE_HELP) },
                                 onOpenLikeApp = viewModel::openLikeAppDialog,
+                                onCanvasSingleTap = viewModel::onCanvasSingleTap,
+                                onDismissTutorial = viewModel::dismissGestureTutorial,
+                                onReopenGestureTutorial = viewModel::reopenGestureTutorial,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -204,18 +212,19 @@ fun RimaluxApp(
                     .padding(start = 16.dp, end = 16.dp, bottom = 60.dp)
             ) {
                 val activeMessage = uiState.statusMessage.orEmpty()
+                val toastShape = MaterialTheme.shapes.medium
                 Box(
                     modifier = Modifier
                         .widthIn(max = 460.dp)
-                        .shadow(elevation = 4.dp, shape = CircleShape)
-                        .clip(CircleShape)
+                        .shadow(elevation = 4.dp, shape = toastShape)
+                        .clip(toastShape)
                         .background(MaterialTheme.colorScheme.inverseSurface)
                 ) {
                     Text(
                         text = activeMessage,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.inverseOnSurface,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
                     )
                 }
             }
@@ -271,8 +280,24 @@ fun RimaluxApp(
             )
         }
 
+        if (uiState.isPatternLayoutDialogOpen) {
+            PatternLayoutDialog(
+                selectedMode = uiState.config.patternWeightMode,
+                onSelectMode = viewModel::setPatternWeightMode,
+                onDismiss = { viewModel.setPatternLayoutDialogOpen(false) }
+            )
+        }
+
+        if (uiState.isColorFillDialogOpen) {
+            ColorFillStyleDialog(
+                selectedMode = uiState.config.colorFillMode,
+                onSelectMode = viewModel::setColorFillMode,
+                onDismiss = { viewModel.setColorFillDialogOpen(false) }
+            )
+        }
+
         if (uiState.isLikeAppDialogOpen) {
-            com.example.ui.components.LikeAppDialog(
+            LikeAppDialog(
                 onRateApp = viewModel::rateApp,
                 onOpenSendThanks = viewModel::openSendThanksDialog,
                 onDismiss = viewModel::closeLikeAppDialog
@@ -280,7 +305,7 @@ fun RimaluxApp(
         }
 
         if (uiState.isSendThanksDialogOpen) {
-            com.example.ui.components.SendThanksDialog(
+            SendThanksDialog(
                 onSendTip = viewModel::sendThanksTip,
                 onDismiss = viewModel::closeSendThanksDialog
             )

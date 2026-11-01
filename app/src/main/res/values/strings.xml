@@ -14,7 +14,51 @@
     <string name="label_preview_overlay">Preview Overlay</string>
     <string name="overlay_mode_none">Clean</string>
     <string name="overlay_mode_lock">Lock Screen</string>
-    <string name="overlay_mode_icons">Home Icons</string>
+    <string name="overlay_mode_icons">Home Screen</string>
+
+    <!-- realistic phone mockup overlay copy -->
+    <string name="mockup_clock_lock">09:41</string>
+    <string name="mockup_clock_status">9:41</string>
+    <string name="mockup_carrier">Rimalux 5G</string>
+    <string name="mockup_battery_pct">86%</string>
+    <string name="mockup_date_short">Tue, Oct 31</string>
+    <string name="mockup_weather">22°C · Clear</string>
+    <string name="mockup_search_hint">Search apps and web</string>
+    <string name="mockup_notif_1_title">Design Sync</string>
+    <string name="mockup_notif_1_body">10:30 AM · Studio Room</string>
+    <string name="mockup_notif_1_time">2m</string>
+    <string name="mockup_notif_2_title">Alex Rivera</string>
+    <string name="mockup_notif_2_body">New OLED palette looks clean</string>
+    <string name="mockup_notif_2_time">14m</string>
+
+    <string name="mockup_app_calendar">Calendar</string>
+    <string name="mockup_app_photos">Photos</string>
+    <string name="mockup_app_maps">Maps</string>
+    <string name="mockup_app_clock">Clock</string>
+    <string name="mockup_app_mail">Mail</string>
+    <string name="mockup_app_music">Music</string>
+    <string name="mockup_app_files">Files</string>
+    <string name="mockup_app_settings">Settings</string>
+    <string name="mockup_app_phone">Phone</string>
+    <string name="mockup_app_messages">Messages</string>
+    <string name="mockup_app_browser">Browser</string>
+    <string name="mockup_app_camera">Camera</string>
+
+    <!-- minimalist studio gesture tutorial & reminder -->
+    <string name="tutorial_title">Studio Gestures</string>
+    <string name="tutorial_swipe_horiz_title">Swipe Left or Right</string>
+    <string name="tutorial_swipe_horiz_desc">Browse next or previous wallpapers</string>
+    <string name="tutorial_double_tap_title">Double-Tap</string>
+    <string name="tutorial_double_tap_desc">Apply, save, or share wallpaper</string>
+    <string name="tutorial_swipe_up_title">Swipe Up</string>
+    <string name="tutorial_swipe_up_desc">Customize patterns, colors, and ratio</string>
+    <string name="tutorial_swipe_down_title">Swipe Down</string>
+    <string name="tutorial_swipe_down_desc">Cycle lock and home screen previews</string>
+    <string name="tutorial_tap_remind_footer">Tap screen anytime to view hints</string>
+    <string name="btn_dismiss_tutorial">Got It</string>
+    <string name="cd_dismiss_tutorial">Dismiss gesture hints</string>
+    <string name="btn_gesture_guide">Gesture Guide</string>
+    <string name="gesture_guide_sub">View swipe and double-tap shortcuts</string>
 
     <!-- home screen -->
     <string name="label_pitch_black_ratio">True Black Ratio</string>
@@ -25,17 +69,17 @@
     <string name="preview_pending_changes_notice">Settings updated · Swipe left for next</string>
     <string name="preview_true_black_percent">%1$d%% True Black</string>
 
-    <string name="summary_patterns_random">Random (%1$d) · %2$s</string>
-    <string name="summary_patterns_selected">%1$s · %2$s</string>
+    <string name="summary_patterns_random">Random (%1$d)</string>
+    <string name="summary_patterns_selected">%1$s</string>
     <string name="weight_short_normal">Normal</string>
     <string name="weight_short_center">Center Weighted</string>
-    <string name="summary_palette_random">Random · %1$s</string>
-    <string name="summary_palette_single">%1$s · %2$s</string>
-    <string name="summary_palette_list">%1$d Palettes · %2$s</string>
+    <string name="summary_palette_random">Randomized</string>
+    <string name="summary_palette_single">%1$s</string>
+    <string name="summary_palette_list">%1$d Palettes</string>
     <string name="fill_short_solid">Solid</string>
     <string name="fill_short_gradient">Gradient</string>
 
-    <string name="target_home">Wallpaper</string>
+    <string name="target_home">Home Screen</string>
     <string name="target_lock">Lock Screen</string>
     <string name="target_both">Both</string>
     <string name="target_both_separate">Both Separate</string>
@@ -50,7 +94,7 @@
 
     <!-- patterns screen (80 procedural math patterns) -->
     <string name="patterns_title">Patterns</string>
-    <string name="patterns_subtitle">Choose pattern layout and randomize across all %1$d procedural patterns or select your favorites.</string>
+    <string name="patterns_subtitle">Randomize across all %1$d procedural patterns or select your favorites.</string>
     <string name="label_pattern_layout">Pattern Layout</string>
     <string name="weight_mode_normal">Normal</string>
     <string name="weight_mode_center">Center Weighted</string>
@@ -236,7 +280,7 @@
 
     <!-- palettes screen & solid/gradient option -->
     <string name="palettes_title">Colors</string>
-    <string name="palettes_subtitle">Choose fill style and select active color palettes for generation.</string>
+    <string name="palettes_subtitle">Select active color palettes for generation.</string>
     <string name="label_color_shading">Color Fill Style</string>
     <string name="fill_mode_solid">Solid Colors</string>
     <string name="fill_mode_gradient">Gradients</string>
@@ -288,7 +332,7 @@
     <!-- auto-change troubleshooting help screen -->
     <string name="auto_help_title">Auto-Change Help</string>
     <string name="auto_help_why_title">Why Auto-Change Stops Working</string>
-    <string name="auto_help_why_body">Many phone brands include aggressive battery savers that force-stop background apps which stop auto-change when your screen is off. Setting Rimalux to Unrestricted lets auto-change run reliably with virtually zero battery drain.</string>
+    <string name="auto_help_why_body">Many phone brands include aggressive battery savers that force-stop background apps which pause auto-change when your screen is off. Setting Rimalux to Unrestricted lets auto-change run reliably with virtually zero battery drain.</string>
 
     <string name="auto_help_vendor_section_title">Brand-Specific Instructions</string>
     <string name="auto_help_vendor_detected_sub">Detected device: %1$s</string>
@@ -365,7 +409,7 @@
 
     <!-- Enjoying Rimalux & Send Thanks (Voluntary Tip Jar) -->
     <string name="btn_like_the_app">Enjoying Rimalux?</string>
-    <string name="dialog_like_app_title">Like Rimalux?</string>
+    <string name="dialog_like_app_title">Enjoying Rimalux?</string>
     <string name="dialog_like_app_sub">Rimalux is 100% free with no ads or tracking. If it made your setup look nice, leaving a review or sending a tip is always appreciated.</string>
     <string name="btn_rate_app">Rate the App</string>
     <string name="btn_send_thanks">Send a Thanks</string>
@@ -378,5 +422,5 @@
     <string name="tip_10_usd">$10</string>
     <string name="tip_20_usd">$20</string>
     <string name="msg_rating_launched">Opening Play Store for rating…</string>
-    <string name="msg_thanks_sent">Thank you so much for sending a %1$s thanks! Your support means the world.</string>
+    <string name="msg_thanks_sent">Thank you so much for the %1$s! Your tip means the world.</string>
 </resources>

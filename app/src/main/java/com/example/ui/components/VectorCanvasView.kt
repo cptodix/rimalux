@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,24 +18,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -47,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -68,17 +64,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.MockupOverlayMode
 import com.example.model.WallpaperTarget
 import com.example.model.titleRes
 import com.example.ui.RenderedPreviewSnapshot
-import com.example.ui.theme.PlusJakartaSansFontFamily
 import kotlin.math.abs
 import kotlin.math.tanh
 import kotlinx.coroutines.Job
@@ -114,6 +109,7 @@ fun SwipeableWallpaperDeck(
     onSwipeRightCommitted: () -> Boolean,
     onRightEdgeBounce: () -> Unit,
     onDoubleTap: () -> Unit,
+    onSingleTap: () -> Unit = {},
     onSwipeDown: () -> Unit = {},
     onVerticalSwipeUpDelta: (Float) -> Unit,
     onVerticalSwipeUpEnd: (Float) -> Unit,
@@ -164,12 +160,21 @@ fun SwipeableWallpaperDeck(
     val latestOnSwipeRight by rememberUpdatedState(onSwipeRightCommitted)
     val latestOnBounce by rememberUpdatedState(onRightEdgeBounce)
     val latestOnDoubleTap by rememberUpdatedState(onDoubleTap)
+    val latestOnSingleTap by rememberUpdatedState(onSingleTap)
     val latestOnSwipeDown by rememberUpdatedState(onSwipeDown)
     val latestOnVerticalDelta by rememberUpdatedState(onVerticalSwipeUpDelta)
     val latestOnVerticalEnd by rememberUpdatedState(onVerticalSwipeUpEnd)
 
     val safeWidthPx = containerWidthPx.coerceAtLeast(1).toFloat()
-    val currentShift = dragOffsetX.value
+    val showPreviousSlide by remember(canSwipeRight) {
+        derivedStateOf { canSwipeRight && dragOffsetX.value > 0.5f }
+    }
+    val showNextSlide by remember {
+        derivedStateOf { dragOffsetX.value < -0.5f }
+    }
+    val showRightBounceRim by remember(canSwipeRight) {
+        derivedStateOf { !canSwipeRight && dragOffsetX.value > 1f }
+    }
 
     Box(
         modifier = modifier
@@ -180,8 +185,23 @@ fun SwipeableWallpaperDeck(
                     containerWidthPx = size.width
                 }
             }
+            .semantics {
+                onClick(label = "Toggle gesture guide") {
+                    if (latestGesturesEnabled && !isCommittingSlide) {
+                        latestOnSingleTap()
+                        true
+                    } else {
+                        false
+                    }
+                }
+            }
             .pointerInput(Unit) {
                 detectTapGestures(
+                    onTap = {
+                        if (latestGesturesEnabled && !isCommittingSlide) {
+                            latestOnSingleTap()
+                        }
+                    },
                     onDoubleTap = {
                         if (latestGesturesEnabled && !isCommittingSlide) {
                             latestOnDoubleTap()
@@ -399,12 +419,13 @@ fun SwipeableWallpaperDeck(
             .testTag("vector_preview_canvas")
     ) {
         // Incoming Previous Page (underneath on left when dragging right with available history)
-        if (currentShift > 0.5f && canSwipeRight) {
-            val revealFraction = (currentShift / safeWidthPx).coerceIn(0f, 1f)
+        if (showPreviousSlide) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
+                        val shift = dragOffsetX.value
+                        val revealFraction = (shift / safeWidthPx).coerceIn(0f, 1f)
                         translationX = -safeWidthPx * 0.36f * (1f - revealFraction)
                         alpha = 0.62f + 0.38f * revealFraction
                     }
@@ -422,12 +443,10 @@ fun SwipeableWallpaperDeck(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    translationX = when {
-                        currentShift < 0f -> currentShift * 0.42f
-                        else -> currentShift
-                    }
-                    alpha = if (currentShift < 0f) {
-                        val outFrac = (-currentShift / safeWidthPx).coerceIn(0f, 1f)
+                    val shift = dragOffsetX.value
+                    translationX = if (shift < 0f) shift * 0.42f else shift
+                    alpha = if (shift < 0f) {
+                        val outFrac = (-shift / safeWidthPx).coerceIn(0f, 1f)
                         1f - 0.36f * outFrac
                     } else {
                         1f
@@ -442,12 +461,12 @@ fun SwipeableWallpaperDeck(
         }
 
         // Incoming Next Page (slides over from right edge when swiping left)
-        if (currentShift < -0.5f) {
+        if (showNextSlide) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        translationX = safeWidthPx + currentShift
+                        translationX = safeWidthPx + dragOffsetX.value
                     }
             ) {
                 WallpaperSlideSurface(
@@ -466,21 +485,25 @@ fun SwipeableWallpaperDeck(
         }
 
         // Subtle left-edge elastic rim glow during right-edge bounce
-        if (currentShift > 1f && !canSwipeRight) {
-            val bounceIntensity = (currentShift / (safeWidthPx * 0.22f)).coerceIn(0f, 1f)
+        if (showRightBounceRim) {
+            val primaryColor = MaterialTheme.colorScheme.primary
+            val bounceRimBrush = remember(primaryColor) {
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        primaryColor.copy(alpha = 0.24f),
+                        Color.Transparent
+                    )
+                )
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxHeight()
                     .width(44.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.24f * bounceIntensity),
-                                Color.Transparent
-                            )
-                        )
-                    )
+                    .graphicsLayer {
+                        alpha = (dragOffsetX.value / (safeWidthPx * 0.22f)).coerceIn(0f, 1f)
+                    }
+                    .background(bounceRimBrush)
             )
         }
 
@@ -491,7 +514,7 @@ fun SwipeableWallpaperDeck(
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize()
         ) {
-            LockScreenOverlayMockup()
+            LockScreenOverlayMockup(bottomClearance = bottomOverlayClearance)
         }
 
         AnimatedVisibility(
@@ -574,90 +597,92 @@ fun SetWallpaperTargetDialog(
     onShareWallpaper: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = MaterialTheme.shapes.extraLarge,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 0.dp,
-        modifier = Modifier.testTag("dialog_set_wallpaper_target"),
-        title = {
-            Text(
-                text = stringResource(R.string.dialog_set_wallpaper_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                WallpaperTarget.entries.forEach { target ->
-                    val isCurrent = selectedTarget != null && selectedTarget == target
-                    Surface(
-                        selected = isCurrent,
-                        onClick = { onSelectTargetAndApply(target) },
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (isCurrent) {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHighest
-                        },
-                        border = if (isCurrent) {
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
-                        } else {
-                            null
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .minimumInteractiveComponentSize()
-                            .testTag("manual_target_${target.id}")
+    RimaluxModalDialog(
+        dialogTestTag = "dialog_set_wallpaper_target",
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = stringResource(R.string.dialog_set_wallpaper_title),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            WallpaperTarget.entries.forEach { target ->
+                val isCurrent = selectedTarget != null && selectedTarget == target
+                Surface(
+                    selected = isCurrent,
+                    onClick = { onSelectTargetAndApply(target) },
+                    shape = MaterialTheme.shapes.medium,
+                    color = if (isCurrent) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    },
+                    border = if (isCurrent) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
+                    } else {
+                        BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .minimumInteractiveComponentSize()
+                        .testTag("manual_target_${target.id}")
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
-                        ) {
-                            Text(
-                                text = stringResource(target.labelRes),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (isCurrent) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                }
-                            )
-                        }
+                        Text(
+                            text = stringResource(target.labelRes),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isCurrent) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
                     }
                 }
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                )
-
-                DialogExportActionButton(
-                    label = stringResource(R.string.btn_save_to_device),
-                    icon = Icons.Rounded.Download,
-                    onClick = onSaveToDevice,
-                    modifier = Modifier.testTag("btn_save_to_device")
-                )
-
-                DialogExportActionButton(
-                    label = stringResource(R.string.btn_share_wallpaper),
-                    icon = Icons.Rounded.Share,
-                    onClick = onShareWallpaper,
-                    modifier = Modifier.testTag("btn_share_wallpaper")
-                )
             }
-        },
-        confirmButton = {},
-        dismissButton = {
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            )
+
+            DialogExportActionButton(
+                label = stringResource(R.string.btn_save_to_device),
+                icon = Icons.Rounded.Download,
+                onClick = onSaveToDevice,
+                modifier = Modifier.testTag("btn_save_to_device")
+            )
+
+            DialogExportActionButton(
+                label = stringResource(R.string.btn_share_wallpaper),
+                icon = Icons.Rounded.Share,
+                onClick = onShareWallpaper,
+                modifier = Modifier.testTag("btn_share_wallpaper")
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
             TextButton(
                 onClick = onDismiss,
-                shape = CircleShape,
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
                 modifier = Modifier
                     .heightIn(min = 48.dp)
                     .minimumInteractiveComponentSize()
@@ -669,7 +694,7 @@ fun SetWallpaperTargetDialog(
                 )
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -684,8 +709,8 @@ private fun DialogExportActionButton(
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+            width = 0.75.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
         ),
         modifier = modifier
             .fillMaxWidth()
@@ -700,7 +725,7 @@ private fun DialogExportActionButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
             Text(
@@ -710,77 +735,6 @@ private fun DialogExportActionButton(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
-    }
-}
-
-@Composable
-private fun LockScreenOverlayMockup() {
-    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = statusBarTop + 64.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Surface(
-            color = Color.Black.copy(alpha = 0.34f),
-            shape = MaterialTheme.shapes.large
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = "09:41",
-                    fontFamily = PlusJakartaSansFontFamily,
-                    fontWeight = FontWeight.Light,
-                    fontSize = 60.sp,
-                    color = Color.White.copy(alpha = 0.94f),
-                    letterSpacing = (-1.5).sp
-                )
-                Text(
-                    text = "Wed · Oct 29",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.78f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeGridOverlayMockup(bottomClearance: Dp) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp, vertical = 24.dp)
-            .padding(bottom = bottomClearance),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 420.dp)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(22.dp)
-        ) {
-            repeat(2) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    repeat(4) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.14f))
-                                .border(0.5.dp, Color.White.copy(alpha = 0.24f), CircleShape)
-                        )
-                    }
-                }
-            }
         }
     }
 }

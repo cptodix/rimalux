@@ -9,8 +9,12 @@ import android.provider.Settings
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -26,6 +30,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ApplicationProvider
 import com.example.model.ArtPattern
+import com.example.model.ColorFillMode
 import com.example.model.MockupOverlayMode
 import com.example.model.PatternWeightMode
 import com.example.model.StarterPalettes
@@ -205,6 +210,9 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("dialog_set_wallpaper_target").assertIsDisplayed()
         composeTestRule.onNodeWithText("Apply Wallpaper To").assertIsDisplayed()
         composeTestRule.onNodeWithTag("manual_target_home").assertIsDisplayed()
+        composeTestRule.onNode(
+            hasText("Home Screen") and hasAnyAncestor(hasTestTag("dialog_set_wallpaper_target"))
+        ).assertIsDisplayed()
         composeTestRule.onNodeWithTag("manual_target_lock").assertIsDisplayed()
         composeTestRule.onNodeWithTag("manual_target_both").assertIsDisplayed()
         composeTestRule.onNodeWithTag("manual_target_both_separate").assertIsDisplayed()
@@ -336,11 +344,58 @@ class ExampleRobolectricTest {
         // Bottom sheet is preserved as UP (open) when returning from PALETTES page
         composeTestRule.onNodeWithTag("home_settings_sheet").assertIsDisplayed()
 
-        // Verify "auto-change to" & "interval" rows open selection popups and update config
+        // Verify quick popup toggles for Pattern Layout & Color Fill Style inside Studio bottom sheet
+        composeTestRule.onNodeWithTag("home_screen_scroll")
+            .performScrollToNode(hasTestTag("pill_open_pattern_layout"))
+        composeTestRule.onNodeWithTag("pill_open_pattern_layout").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_pattern_layout").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("layout_option_center").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_pattern_layout").assertDoesNotExist()
+        assertEquals(PatternWeightMode.CENTER_WEIGHTED, viewModel.uiState.value.config.patternWeightMode)
+
+        composeTestRule.onNodeWithTag("home_screen_scroll")
+            .performScrollToNode(hasTestTag("pill_open_color_fill"))
+        composeTestRule.onNodeWithTag("pill_open_color_fill").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_color_fill").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("fill_option_gradient").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_color_fill").assertDoesNotExist()
+        assertEquals(ColorFillMode.GRADIENT, viewModel.uiState.value.config.colorFillMode)
+
+        // Verify Apply To & Interval rows are disabled while Auto-Change Wallpaper is OFF
         composeTestRule.onNodeWithText("automatic target").assertDoesNotExist()
         composeTestRule.onNodeWithTag("home_screen_scroll")
-            .performScrollToNode(hasTestTag("pill_open_auto_target"))
+            .performScrollToNode(hasTestTag("pill_open_interval"))
         composeTestRule.onNodeWithText("Apply To").assertIsDisplayed()
+        assertFalse(viewModel.uiState.value.config.autoRotateEnabled)
+        composeTestRule.onNodeWithTag("pill_open_auto_target").assertIsNotEnabled()
+        composeTestRule.onNodeWithTag("pill_open_interval").assertIsNotEnabled()
+        composeTestRule.onNodeWithTag("pill_open_auto_target").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_auto_target").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("pill_open_interval").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_interval_picker").assertDoesNotExist()
+
+        // Toggle Auto-Change Wallpaper ON -> Apply To & Interval become enabled and open unified popups
+        composeTestRule.onNodeWithTag("home_screen_scroll")
+            .performScrollToNode(hasTestTag("switch_auto_rotate"))
+        composeTestRule.onNodeWithTag("switch_auto_rotate").performClick()
+        val autoEnableDeadline = System.currentTimeMillis() + 5_000L
+        while (System.currentTimeMillis() < autoEnableDeadline && !viewModel.uiState.value.config.autoRotateEnabled) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            composeTestRule.waitForIdle()
+            Thread.sleep(15L)
+        }
+        composeTestRule.waitForIdle()
+        assertTrue(viewModel.uiState.value.config.autoRotateEnabled)
+
+        composeTestRule.onNodeWithTag("home_screen_scroll")
+            .performScrollToNode(hasTestTag("pill_open_auto_target"))
+        composeTestRule.onNodeWithTag("pill_open_auto_target").assertIsEnabled()
         composeTestRule.onNodeWithTag("pill_open_auto_target").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("dialog_auto_target").assertIsDisplayed()
@@ -354,6 +409,7 @@ class ExampleRobolectricTest {
 
         composeTestRule.onNodeWithTag("home_screen_scroll")
             .performScrollToNode(hasTestTag("pill_open_interval"))
+        composeTestRule.onNodeWithTag("pill_open_interval").assertIsEnabled()
         composeTestRule.onNodeWithTag("pill_open_interval").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("dialog_interval_picker").assertIsDisplayed()
@@ -362,14 +418,19 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("dialog_interval_picker").assertDoesNotExist()
         assertEquals(15, viewModel.uiState.value.config.intervalMinutes)
 
-        // Verify tapping "custom…" inside interval popup transitions to custom minutes dialog
+        // Verify tapping "Custom…" inside interval popup transitions to custom minutes dialog
         composeTestRule.onNodeWithTag("pill_open_interval").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("btn_custom_interval").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("dialog_interval_picker").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("dialog_custom_interval").assertIsDisplayed()
         composeTestRule.onNodeWithTag("input_custom_interval_minutes").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Cancel").performClick()
+        composeTestRule.onNodeWithTag("btn_cancel_interval_picker").performClick()
+        composeTestRule.waitForIdle()
+
+        // Clean up Auto-Change switch back to OFF
+        viewModel.setAutoRotateEnabled(false)
         composeTestRule.waitForIdle()
 
         // System Back closes sheet back to completely hidden
@@ -771,7 +832,7 @@ class ExampleRobolectricTest {
 
         // Verify updated explanation copy and absence of "Select a brand below" text & inline chips
         composeTestRule.onNodeWithText(
-            "Many phone brands include aggressive battery savers that force-stop background apps which stop auto-change when your screen is off. Setting Rimalux to Unrestricted lets auto-change run reliably with virtually zero battery drain."
+            "Many phone brands include aggressive battery savers that force-stop background apps which pause auto-change when your screen is off. Setting Rimalux to Unrestricted lets auto-change run reliably with virtually zero battery drain."
         ).assertIsDisplayed()
         composeTestRule.onNodeWithText("Select a brand below", substring = true).assertDoesNotExist()
         composeTestRule.onNodeWithTag("chip_vendor_xiaomi").assertDoesNotExist()
@@ -864,8 +925,11 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("btn_like_the_app").performClick()
         composeTestRule.waitForIdle()
 
-        // Verify Like Rimalux popup dialog opens with updated copy
+        // Verify Enjoying Rimalux? popup dialog opens with consistent title & updated copy
         composeTestRule.onNodeWithTag("dialog_like_app").assertIsDisplayed()
+        composeTestRule.onNode(
+            hasText("Enjoying Rimalux?") and hasAnyAncestor(hasTestTag("dialog_like_app"))
+        ).assertIsDisplayed()
         composeTestRule.onNodeWithText(
             "Rimalux is 100% free with no ads or tracking. If it made your setup look nice, leaving a review or sending a tip is always appreciated."
         ).assertIsDisplayed()
@@ -901,7 +965,7 @@ class ExampleRobolectricTest {
 
         composeTestRule.onNodeWithTag("dialog_send_thanks").assertDoesNotExist()
         val status = viewModel.uiState.value.statusMessage.orEmpty()
-        assertTrue("Expected thank-you status message, got: '$status'", status.contains("sending a $3 thanks"))
+        assertEquals("Thank you so much for the $3! Your tip means the world.", status)
 
         // Reopen "Enjoying Rimalux?" -> tap "Rate the App"
         composeTestRule.onNodeWithTag("btn_like_the_app").performClick()
@@ -929,42 +993,48 @@ class ExampleRobolectricTest {
         awaitPreviewReady(viewModel, requireAheadBuffer = true)
         assertEquals(PatternWeightMode.NORMAL, viewModel.uiState.value.config.patternWeightMode)
 
-        // 1. Open bottom sheet on main page -> verify Patterns row shows "Random (80) · Normal" alongside selection mode
+        // 1. Open bottom sheet on main page -> verify Patterns row shows "Random (80)" alongside selection mode
         composeTestRule.onNodeWithTag("home_bottom_sheet_handle").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("home_settings_sheet").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Random (80) · Normal").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Random (80)").assertIsDisplayed()
 
-        // 2. Navigate to Patterns page -> verify "Pattern Layout" card with "Normal" and "Center Weighted" options
-        composeTestRule.onNodeWithTag("pill_open_patterns").performClick()
+        // 2. Open Pattern Layout popup from Studio bottom sheet -> select "Center Weighted"
+        composeTestRule.onNodeWithTag("home_screen_scroll")
+            .performScrollToNode(hasTestTag("pill_open_pattern_layout"))
+        composeTestRule.onNodeWithTag("pill_open_pattern_layout").performClick()
         composeTestRule.waitForIdle()
-        assertEquals(RimaluxScreen.PATTERNS, viewModel.uiState.value.currentScreen)
-        composeTestRule.onNodeWithText("Pattern Layout").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("btn_weight_mode_normal").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("btn_weight_mode_center").assertIsDisplayed()
-
-        // 3. Select "Center Weighted" and also pick a new procedural pattern (e.g. Laves Floret)
-        composeTestRule.onNodeWithTag("btn_weight_mode_center").performClick()
+        composeTestRule.onNodeWithTag("dialog_pattern_layout").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("layout_option_center").performClick()
         composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_pattern_layout").assertDoesNotExist()
         assertEquals(PatternWeightMode.CENTER_WEIGHTED, viewModel.uiState.value.config.patternWeightMode)
+        composeTestRule.onNodeWithText("Random (80)").assertIsDisplayed()
 
-        // Return to Home while still in Randomized mode -> verify "Random (80) · Center Weighted"
-        composeTestRule.onNodeWithTag("btn_back_to_home").performClick()
-        composeTestRule.waitForIdle()
-        assertEquals(RimaluxScreen.HOME, viewModel.uiState.value.currentScreen)
-        composeTestRule.onNodeWithText("Random (80) · Center Weighted").assertIsDisplayed()
-
-        // Re-open Patterns -> select a custom new pattern ("Laves Floret") -> return to Home -> verify "<Pattern> · Center Weighted"
+        // Re-open Patterns -> verify LazyVerticalGrid 2-column phone layout, category FilterChips, and custom pattern pick
         composeTestRule.onNodeWithTag("pill_open_patterns").performClick()
         composeTestRule.waitForIdle()
+        val firstPatternId = ArtPattern.entries[0].id
+        val secondPatternId = ArtPattern.entries[1].id
+        composeTestRule.onNodeWithTag("patterns_screen_list")
+            .performScrollToNode(hasTestTag("pattern_card_$firstPatternId"))
+        val card0Bounds = composeTestRule.onNodeWithTag("pattern_card_$firstPatternId").fetchSemanticsNode().boundsInRoot
+        val card1Bounds = composeTestRule.onNodeWithTag("pattern_card_$secondPatternId").fetchSemanticsNode().boundsInRoot
+        assertEquals("Adaptive grid must place first two pattern cards on the same row on phone width", card0Bounds.top, card1Bounds.top, 2f)
+        assertTrue("Second pattern card must sit to the right of first card", card1Bounds.left >= card0Bounds.right)
+
         composeTestRule.onNodeWithTag("patterns_screen_list")
             .performScrollToNode(hasTestTag("pattern_card_laves_floret"))
         composeTestRule.onNodeWithTag("pattern_card_laves_floret").performClick()
         composeTestRule.waitForIdle()
 
+        composeTestRule.onNodeWithTag("patterns_screen_list")
+            .performScrollToNode(hasTestTag("chip_pattern_cat_all"))
+        composeTestRule.onNodeWithTag("chip_pattern_cat_all").assertIsDisplayed()
+
         composeTestRule.onNodeWithTag("btn_back_to_home").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Floret · Center Weighted").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Floret").assertIsDisplayed()
 
         // 4. Close sheet and swipe left -> verify next wallpaper uses LAVES_FLORET + CENTER_WEIGHTED
         val seedBeforeSwipe = requireNotNull(viewModel.uiState.value.preview).seed
@@ -977,5 +1047,197 @@ class ExampleRobolectricTest {
         val activePreview = requireNotNull(viewModel.uiState.value.preview)
         assertEquals(ArtPattern.LAVES_FLORET, activePreview.pattern)
         assertEquals(PatternWeightMode.CENTER_WEIGHTED, activePreview.patternWeightMode)
+    }
+
+    @Test
+    fun realisticPhoneMockupOverlays_renderLabeledHomeAppsAndLockShortcuts_withoutHittingPreviewInfoOverlay() {
+        composeTestRule.waitForIdle()
+        val activity = composeTestRule.activity
+        val viewModel = ViewModelProvider(
+            activity,
+            RimaluxViewModel.Factory(activity)
+        )[RimaluxViewModel::class.java]
+
+        awaitPreviewReady(viewModel)
+
+        // 1. Swipe down -> Lock Screen overlay
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeDown(startY = height * 0.25f, endY = height * 0.75f, durationMillis = 180L)
+        }
+        composeTestRule.waitForIdle()
+        assertEquals(MockupOverlayMode.LOCK_SCREEN, viewModel.uiState.value.mockupMode)
+        composeTestRule.onNodeWithTag("mockup_lock_screen_overlay").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mockup_lock_status_bar").assertIsDisplayed()
+        composeTestRule.onNodeWithText("09:41").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Design Sync").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Alex Rivera").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mockup_lock_bottom_shortcuts").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("preview_info_overlay").assertIsDisplayed()
+
+        val lockShortcutsBounds = composeTestRule.onNodeWithTag("mockup_lock_bottom_shortcuts").fetchSemanticsNode().boundsInRoot
+        val infoBoundsOnLock = composeTestRule.onNodeWithTag("preview_info_overlay").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Lock Screen bottom shortcuts (${lockShortcutsBounds.bottom}) must stay cleanly above preview_info_overlay (${infoBoundsOnLock.top})",
+            lockShortcutsBounds.bottom <= infoBoundsOnLock.top - 4f
+        )
+
+        // 2. Swipe down -> Home Screen overlay with realistic app icons + app name labels underneath
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeDown(startY = height * 0.25f, endY = height * 0.75f, durationMillis = 180L)
+        }
+        composeTestRule.waitForIdle()
+        assertEquals(MockupOverlayMode.HOME_GRID, viewModel.uiState.value.mockupMode)
+        composeTestRule.onNodeWithTag("mockup_home_screen_overlay").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mockup_home_status_bar").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mockup_home_at_a_glance").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mockup_home_search_bar").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mockup_home_bottom_cluster").assertIsDisplayed()
+
+        val expectedApps = listOf(
+            "calendar" to "Calendar",
+            "photos" to "Photos",
+            "maps" to "Maps",
+            "clock" to "Clock",
+            "mail" to "Mail",
+            "music" to "Music",
+            "files" to "Files",
+            "settings" to "Settings",
+            "phone" to "Phone",
+            "messages" to "Messages",
+            "browser" to "Browser",
+            "camera" to "Camera"
+        )
+        val infoBoundsNormal = composeTestRule.onNodeWithTag("preview_info_overlay").fetchSemanticsNode().boundsInRoot
+
+        for ((key, appName) in expectedApps) {
+            composeTestRule.onNodeWithTag("mockup_app_icon_$key").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("mockup_app_label_$key").assertIsDisplayed()
+            composeTestRule.onNodeWithText(appName).assertIsDisplayed()
+
+            val iconBounds = composeTestRule.onNodeWithTag("mockup_app_icon_$key").fetchSemanticsNode().boundsInRoot
+            val labelBounds = composeTestRule.onNodeWithTag("mockup_app_label_$key").fetchSemanticsNode().boundsInRoot
+            assertTrue(
+                "App name '$appName' (${labelBounds.top}) must sit underneath its app icon (${iconBounds.bottom})",
+                labelBounds.top >= iconBounds.bottom - 1f
+            )
+            assertTrue(
+                "App name '$appName' (${labelBounds.bottom}) must never hit or overlap preview_info_overlay (${infoBoundsNormal.top})",
+                labelBounds.bottom <= infoBoundsNormal.top - 4f
+            )
+        }
+
+        // 3. Trigger hasUnappliedChanges (pushes preview_info_overlay higher up) -> verify Home Screen overlay STILL clears it
+        viewModel.updatePitchBlackRatio(0.72f)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("preview_pending_notice").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("preview_info_overlay").assertIsDisplayed()
+
+        val infoBoundsElevated = composeTestRule.onNodeWithTag("preview_info_overlay").fetchSemanticsNode().boundsInRoot
+        val homeBottomBoundsElevated = composeTestRule.onNodeWithTag("mockup_home_bottom_cluster").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Home Screen apps & dock (${homeBottomBoundsElevated.bottom}) must stay cleanly above elevated preview_info_overlay (${infoBoundsElevated.top})",
+            homeBottomBoundsElevated.bottom <= infoBoundsElevated.top - 4f
+        )
+    }
+
+    @Test
+    fun firstOpenGestureTutorial_autoShowsOnce_persistsDismissal_andReopensViaSingleTapOrBottomSheetGuide() {
+        composeTestRule.waitForIdle()
+        val activity = composeTestRule.activity
+        val viewModel = ViewModelProvider(
+            activity,
+            RimaluxViewModel.Factory(activity)
+        )[RimaluxViewModel::class.java]
+
+        awaitPreviewReady(viewModel, requireAheadBuffer = true)
+
+        // 1. Active automatically on first app open (translucent modal, no title or Got It button)
+        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
+        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("gesture_tutorial_card").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Studio Gestures").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Swipe Left or Right").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Double-Tap").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Swipe Up").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Swipe Down").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Got It").assertDoesNotExist()
+
+        // Attempting to dismiss within 800ms of showing must be ignored
+        viewModel.dismissGestureTutorial()
+        composeTestRule.waitForIdle()
+        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
+
+        // 2. Dismiss after 800ms minimum display guard -> leaves preview clean and persists to DataStore
+        Thread.sleep(850L)
+        viewModel.dismissGestureTutorial()
+        composeTestRule.waitForIdle()
+        assertFalse(viewModel.uiState.value.isGestureTutorialVisible)
+        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertDoesNotExist()
+
+        val repo = com.example.data.WallpaperPreferencesRepository(activity)
+        val storedAfterDismiss = kotlinx.coroutines.runBlocking { repo.getSnapshot() }
+        assertTrue("Dismissing tutorial must persist hasSeenGestureTutorial = true", storedAfterDismiss.hasSeenGestureTutorial)
+
+        // Subsequent cold start ViewModel must NOT auto-open tutorial
+        val secondSessionVm = RimaluxViewModel(activity, repo)
+        val reloadDeadline = System.currentTimeMillis() + 5_000L
+        while (System.currentTimeMillis() < reloadDeadline && secondSessionVm.uiState.value.preview == null) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(15L)
+        }
+        assertFalse(
+            "Tutorial must remain hidden on subsequent app launches once seen",
+            secondSessionVm.uiState.value.isGestureTutorialVisible
+        )
+
+        // 3. Forgot later: Single-tap clean preview toggles minimalist hint without permanent UI clutter
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performClick()
+        composeTestRule.mainClock.advanceTimeBy(400L)
+        composeTestRule.waitForIdle()
+        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
+        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertIsDisplayed()
+
+        // Tap before 800ms is ignored
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performClick()
+        composeTestRule.mainClock.advanceTimeBy(200L)
+        composeTestRule.waitForIdle()
+        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
+
+        // Tap after 800ms dismisses hint
+        Thread.sleep(850L)
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performClick()
+        composeTestRule.mainClock.advanceTimeBy(400L)
+        composeTestRule.waitForIdle()
+        assertFalse(viewModel.uiState.value.isGestureTutorialVisible)
+        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertDoesNotExist()
+
+        // 4. Bottom sheet must NOT contain gesture guide button (removed per user request to keep sheet clean)
+        composeTestRule.onNodeWithTag("home_bottom_sheet_handle").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("home_settings_sheet").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_reopen_tutorial").assertDoesNotExist()
+
+        // Close bottom sheet
+        composeTestRule.onNodeWithTag("home_bottom_sheet_handle").performClick()
+        composeTestRule.mainClock.advanceTimeBy(300L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("home_settings_sheet").assertDoesNotExist()
+
+        // Reopen tutorial via viewModel for swipe dismissal verification
+        viewModel.reopenGestureTutorial()
+        composeTestRule.waitForIdle()
+        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
+        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertIsDisplayed()
+
+        // 5. Performing any gesture directly through the tutorial after 800ms executes immediately and auto-dismisses hint
+        Thread.sleep(850L)
+        val seedBeforeSwipe = requireNotNull(viewModel.uiState.value.preview).seed
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeLeft(startX = width * 0.85f, endX = width * 0.15f, durationMillis = 180L)
+        }
+        awaitPreviewReady(viewModel, previousSeed = seedBeforeSwipe)
+        assertFalse(viewModel.uiState.value.isGestureTutorialVisible)
+        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertDoesNotExist()
+        assertNotEquals(seedBeforeSwipe, viewModel.uiState.value.preview?.seed)
     }
 }

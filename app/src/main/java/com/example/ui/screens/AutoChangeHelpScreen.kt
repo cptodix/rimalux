@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -60,14 +61,13 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.example.R
 import com.example.scheduler.OemBackgroundHelper
 import com.example.scheduler.OemVendor
 import com.example.scheduler.SettingsLaunchResult
+import com.example.ui.components.RimaluxModalDialog
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -149,10 +149,10 @@ fun AutoChangeHelpScreen(
                 item(key = "why_paused_card") {
                     Surface(
                         shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
                         border = BorderStroke(
                             width = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -212,7 +212,7 @@ fun AutoChangeHelpScreen(
 
                             Surface(
                                 onClick = { isBrandDialogOpen = true },
-                                shape = CircleShape,
+                                shape = MaterialTheme.shapes.small,
                                 color = Color.Transparent,
                                 modifier = Modifier
                                     .minimumInteractiveComponentSize()
@@ -226,7 +226,6 @@ fun AutoChangeHelpScreen(
                                     Text(
                                         text = stringResource(R.string.auto_help_not_your_device),
                                         style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                 }
@@ -279,14 +278,14 @@ fun AutoChangeHelpScreen(
                                 if (selectedVendor == detectedVendor) {
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Surface(
-                                        shape = CircleShape,
+                                        shape = MaterialTheme.shapes.extraSmall,
                                         color = MaterialTheme.colorScheme.secondaryContainer
                                     ) {
                                         Text(
                                             text = stringResource(R.string.auto_help_badge_your_device),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                         )
                                     }
                                 }
@@ -331,7 +330,7 @@ fun AutoChangeHelpScreen(
                                             }
                                         }
                                     },
-                                    shape = CircleShape,
+                                    shape = MaterialTheme.shapes.medium,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .heightIn(min = 48.dp)
@@ -362,7 +361,10 @@ fun AutoChangeHelpScreen(
                                             )
                                         }
                                     },
-                                    shape = CircleShape,
+                                    shape = MaterialTheme.shapes.medium,
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                    ),
                                     border = BorderStroke(
                                         width = 1.dp,
                                         color = MaterialTheme.colorScheme.outlineVariant
@@ -376,6 +378,7 @@ fun AutoChangeHelpScreen(
                                     Icon(
                                         imageVector = Icons.Rounded.Settings,
                                         contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -448,38 +451,24 @@ private fun BrandSelectDialog(
     val colorScheme = MaterialTheme.colorScheme
     val shapes = MaterialTheme.shapes
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = shapes.extraLarge,
-            color = colorScheme.surfaceContainerHigh,
-            tonalElevation = 0.dp,
-            border = BorderStroke(
-                width = 1.dp,
-                color = colorScheme.outlineVariant.copy(alpha = 0.45f)
-            ),
-            modifier = Modifier
-                .widthIn(max = 380.dp)
-                .fillMaxWidth()
-                .testTag("dialog_select_brand")
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.dialog_select_brand_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = colorScheme.onSurface
-                )
+    RimaluxModalDialog(
+        dialogTestTag = "dialog_select_brand",
+        maxWidth = 380.dp,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = stringResource(R.string.dialog_select_brand_title),
+            style = MaterialTheme.typography.titleLarge,
+            color = colorScheme.onSurface
+        )
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                        .testTag("brand_select_list"),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .testTag("brand_select_list"),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OemVendor.entries.forEach { vendor ->
@@ -496,7 +485,7 @@ private fun BrandSelectDialog(
                             border = if (isSelected) {
                                 BorderStroke(1.dp, colorScheme.primary.copy(alpha = 0.65f))
                             } else {
-                                null
+                                BorderStroke(0.5.dp, colorScheme.outlineVariant.copy(alpha = 0.35f))
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -530,7 +519,7 @@ private fun BrandSelectDialog(
                                         )
                                         if (vendor == detectedVendor) {
                                             Surface(
-                                                shape = CircleShape,
+                                                shape = shapes.extraSmall,
                                                 color = if (isSelected) {
                                                     colorScheme.primary.copy(alpha = 0.18f)
                                                 } else {
@@ -545,7 +534,7 @@ private fun BrandSelectDialog(
                                                     } else {
                                                         colorScheme.onSecondaryContainer
                                                     },
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                                 )
                                             }
                                         }
@@ -577,20 +566,21 @@ private fun BrandSelectDialog(
                 ) {
                     TextButton(
                         onClick = onDismiss,
-                        shape = CircleShape,
+                        shape = shapes.small,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = colorScheme.onSurfaceVariant
+                        ),
                         modifier = Modifier
                             .heightIn(min = 48.dp)
                             .minimumInteractiveComponentSize()
                             .testTag("btn_cancel_brand_select")
                     ) {
-                        Text(
-                            text = stringResource(R.string.btn_cancel),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.btn_cancel),
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
             }
-        }
     }
 }
 

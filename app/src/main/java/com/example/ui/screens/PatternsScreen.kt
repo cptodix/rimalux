@@ -23,12 +23,15 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -95,24 +98,23 @@ fun PatternsScreen(
             ArtPattern.entries.filter { it.category == selectedCategory }
         }
     }
-    val patternRows = remember(filteredPatterns) { filteredPatterns.chunked(2) }
     val activePreviewPattern = uiState.preview?.pattern
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     val segmentedColors = SegmentedButtonDefaults.colors(
         activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
         activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        activeBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
         inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    val segmentedBorder = SegmentedButtonDefaults.borderStroke(
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        inactiveBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
     )
     val chipColors = FilterChipDefaults.filterChipColors(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
         selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
     )
 
     Scaffold(
@@ -160,9 +162,10 @@ fun PatternsScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
             contentAlignment = Alignment.TopCenter
         ) {
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 160.dp),
                 modifier = Modifier
-                    .widthIn(max = 680.dp)
+                    .widthIn(max = 920.dp)
                     .fillMaxSize()
                     .testTag("patterns_screen_list"),
                 contentPadding = PaddingValues(
@@ -171,9 +174,13 @@ fun PatternsScreen(
                     top = 4.dp,
                     bottom = innerPadding.calculateBottomPadding() + 32.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                item(key = "patterns_subtitle") {
+                item(
+                    key = "patterns_subtitle",
+                    span = { GridItemSpan(maxLineSpan) }
+                ) {
                     Text(
                         text = stringResource(R.string.patterns_subtitle, ArtPattern.entries.size),
                         style = MaterialTheme.typography.bodyMedium,
@@ -181,80 +188,21 @@ fun PatternsScreen(
                     )
                 }
 
-                // Normal vs Center Weighted Tonal Selector Card (mirrors Colors page Color Shading card)
-                item(key = "pattern_weight_card") {
-                    Surface(
-                        shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.surfaceContainer
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.label_pattern_layout),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                                SegmentedButton(
-                                    selected = uiState.config.patternWeightMode == PatternWeightMode.NORMAL,
-                                    onClick = { onSetPatternWeightMode(PatternWeightMode.NORMAL) },
-                                    icon = {},
-                                    colors = segmentedColors,
-                                    border = segmentedBorder,
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = 0,
-                                        count = 2,
-                                        baseShape = CircleShape
-                                    ),
-                                    modifier = Modifier
-                                        .minimumInteractiveComponentSize()
-                                        .testTag("btn_weight_mode_normal")
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.weight_mode_normal),
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                }
-                                SegmentedButton(
-                                    selected = uiState.config.patternWeightMode == PatternWeightMode.CENTER_WEIGHTED,
-                                    onClick = { onSetPatternWeightMode(PatternWeightMode.CENTER_WEIGHTED) },
-                                    icon = {},
-                                    colors = segmentedColors,
-                                    border = segmentedBorder,
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = 1,
-                                        count = 2,
-                                        baseShape = CircleShape
-                                    ),
-                                    modifier = Modifier
-                                        .minimumInteractiveComponentSize()
-                                        .testTag("btn_weight_mode_center")
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.weight_mode_center),
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // Randomized vs Multi-Select Segmented Bar
-                item(key = "patterns_mode_bar") {
+                item(
+                    key = "patterns_mode_bar",
+                    span = { GridItemSpan(maxLineSpan) }
+                ) {
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         SegmentedButton(
                             selected = uiState.config.patternsRandomized,
                             onClick = { onSetRandomized(true) },
                             icon = {},
                             colors = segmentedColors,
-                            border = segmentedBorder,
                             shape = SegmentedButtonDefaults.itemShape(
                                 index = 0,
                                 count = 2,
-                                baseShape = CircleShape
+                                baseShape = MaterialTheme.shapes.medium
                             ),
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
@@ -270,11 +218,10 @@ fun PatternsScreen(
                             onClick = { onSetRandomized(false) },
                             icon = {},
                             colors = segmentedColors,
-                            border = segmentedBorder,
                             shape = SegmentedButtonDefaults.itemShape(
                                 index = 1,
                                 count = 2,
-                                baseShape = CircleShape
+                                baseShape = MaterialTheme.shapes.medium
                             ),
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
@@ -290,7 +237,10 @@ fun PatternsScreen(
 
                 // Category Filter FlowRow shown ONLY in Select Custom mode
                 if (!uiState.config.patternsRandomized) {
-                    item(key = "patterns_category_filters") {
+                    item(
+                        key = "patterns_category_filters",
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -300,9 +250,27 @@ fun PatternsScreen(
                             FilterChip(
                                 selected = isAll,
                                 onClick = { selectedCategory = null },
-                                shape = CircleShape,
+                                shape = MaterialTheme.shapes.small,
                                 colors = chipColors,
-                                border = null,
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isAll,
+                                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                                    selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                                    borderWidth = 0.75.dp,
+                                    selectedBorderWidth = 1.dp
+                                ),
+                                leadingIcon = if (isAll) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
                                 label = {
                                     Text(
                                         text = stringResource(R.string.cat_all, ArtPattern.entries.size),
@@ -321,9 +289,27 @@ fun PatternsScreen(
                                     onClick = {
                                         selectedCategory = if (isPicked) null else category
                                     },
-                                    shape = CircleShape,
+                                    shape = MaterialTheme.shapes.small,
                                     colors = chipColors,
-                                    border = null,
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = isPicked,
+                                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                                        selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                                        borderWidth = 0.75.dp,
+                                        selectedBorderWidth = 1.dp
+                                    ),
+                                    leadingIcon = if (isPicked) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
                                     label = {
                                         Text(
                                             text = stringResource(category.labelRes),
@@ -340,7 +326,10 @@ fun PatternsScreen(
                 }
 
                 if (!uiState.config.patternsRandomized) {
-                    item(key = "patterns_hint") {
+                    item(
+                        key = "patterns_hint",
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -363,6 +352,7 @@ fun PatternsScreen(
                             ) {
                                 TextButton(
                                     onClick = onSelectAllPatterns,
+                                    shape = MaterialTheme.shapes.small,
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .minimumInteractiveComponentSize()
@@ -375,6 +365,10 @@ fun PatternsScreen(
                                 }
                                 TextButton(
                                     onClick = onSelectNonePatterns,
+                                    shape = MaterialTheme.shapes.small,
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .minimumInteractiveComponentSize()
@@ -382,8 +376,7 @@ fun PatternsScreen(
                                 ) {
                                     Text(
                                         text = stringResource(R.string.btn_select_none),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MaterialTheme.typography.labelMedium
                                     )
                                 }
                             }
@@ -391,31 +384,22 @@ fun PatternsScreen(
                     }
                 }
 
-                // 2-Column Gallery of all 64 Procedural Patterns using pre-rendered static drawables
+                // Adaptive Multi-Column Gallery of all 80 Procedural Patterns (2 cols on phone, 3-4 cols on foldables/tablets)
                 items(
-                    items = patternRows,
-                    key = { row -> row.joinToString("_") { it.id } }
-                ) { rowPatterns ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        rowPatterns.forEach { pattern ->
-                            val isSelected = !uiState.config.patternsRandomized &&
-                                pattern in uiState.config.selectedPatterns
-                            val isCurrentlyRendered = activePreviewPattern == pattern
-                            PatternGalleryCard(
-                                pattern = pattern,
-                                isSelected = isSelected,
-                                isCurrentlyRendered = isCurrentlyRendered,
-                                onClick = { onTogglePattern(pattern) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        if (rowPatterns.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
+                    items = filteredPatterns,
+                    key = { it.id },
+                    contentType = { "pattern_card" }
+                ) { pattern ->
+                    val isSelected = !uiState.config.patternsRandomized &&
+                        pattern in uiState.config.selectedPatterns
+                    val isCurrentlyRendered = activePreviewPattern == pattern
+                    PatternGalleryCard(
+                        pattern = pattern,
+                        isSelected = isSelected,
+                        isCurrentlyRendered = isCurrentlyRendered,
+                        onClick = { onTogglePattern(pattern) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -442,7 +426,7 @@ private fun PatternGalleryCard(
         border = when {
             isSelected -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
             isCurrentlyRendered -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
-            else -> null
+            else -> BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f))
         },
         modifier = modifier
             .minimumInteractiveComponentSize()
@@ -457,7 +441,7 @@ private fun PatternGalleryCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(112.dp)
-                        .clip(MaterialTheme.shapes.medium)
+                        .clip(MaterialTheme.shapes.small)
                         .background(Color.Black)
                 )
 

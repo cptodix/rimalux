@@ -1,36 +1,30 @@
 package com.example.ui.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +44,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -60,6 +53,7 @@ import com.example.R
 import com.example.model.GeneratorConfig
 import com.example.model.IntervalFormatter
 import com.example.model.WallpaperTarget
+import com.example.ui.components.RimaluxModalDialog
 
 @Composable
 fun AutoChangeSection(
@@ -70,7 +64,7 @@ fun AutoChangeSection(
     onOpenAutoChangeHelp: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val subSectionAlpha = if (config.autoRotateEnabled) 1f else 0.78f
+    val subSectionAlpha = if (config.autoRotateEnabled) 1f else 0.55f
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -79,6 +73,10 @@ fun AutoChangeSection(
         Surface(
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainer,
+            border = BorderStroke(
+                width = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -131,9 +129,10 @@ fun AutoChangeSection(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
             )
 
-            // Auto-Change To Row (opens popup dialog)
+            // Auto-Change To Row (opens popup dialog when Auto-Change is enabled)
             Surface(
                 onClick = onOpenAutoTargetDialog,
+                enabled = config.autoRotateEnabled,
                 color = Color.Transparent,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -155,7 +154,7 @@ fun AutoChangeSection(
                     ) {
                         Text(
                             text = stringResource(R.string.label_auto_target),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -183,9 +182,10 @@ fun AutoChangeSection(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
             )
 
-            // Interval Row (opens popup dialog)
+            // Interval Row (opens popup dialog when Auto-Change is enabled)
             Surface(
                 onClick = onOpenIntervalDialog,
+                enabled = config.autoRotateEnabled,
                 color = Color.Transparent,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -207,7 +207,7 @@ fun AutoChangeSection(
                     ) {
                         Text(
                             text = stringResource(R.string.label_interval),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -232,14 +232,14 @@ fun AutoChangeSection(
             }
         }
 
-        // Low-emphasis M3 clickable pill under Interval (obviously interactive via outline + chevron, calm for last-resort help)
+        // Low-emphasis M3 clickable control under Interval (subordinate helper action)
         Surface(
             onClick = onOpenAutoChangeHelp,
-            shape = CircleShape,
+            shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                width = 0.75.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
             ),
             modifier = Modifier
                 .align(Alignment.Start)
@@ -247,7 +247,7 @@ fun AutoChangeSection(
                 .testTag("btn_auto_change_help")
         ) {
             Row(
-                modifier = Modifier.padding(start = 14.dp, end = 10.dp, top = 9.dp, bottom = 9.dp),
+                modifier = Modifier.padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -259,7 +259,7 @@ fun AutoChangeSection(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.btn_auto_change_troubleshoot),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -277,48 +277,6 @@ fun AutoChangeSection(
 }
 
 @Composable
-private fun RimaluxModalDialog(
-    dialogTestTag: String,
-    onDismiss: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    BackHandler(onBack = onDismiss)
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
-            .pointerInput(onDismiss) {
-                detectTapGestures(onTap = { onDismiss() })
-            }
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 0.dp,
-            border = BorderStroke(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-            ),
-            modifier = Modifier
-                .widthIn(max = 360.dp)
-                .fillMaxWidth()
-                .testTag(dialogTestTag)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-                content = content
-            )
-        }
-    }
-}
-
-@Composable
 fun AutoTargetDialog(
     selectedTarget: WallpaperTarget,
     onSelectTarget: (WallpaperTarget) -> Unit,
@@ -330,12 +288,15 @@ fun AutoTargetDialog(
     ) {
         Text(
             text = stringResource(R.string.label_auto_target),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
 
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             WallpaperTarget.entries.forEach { target ->
@@ -352,7 +313,7 @@ fun AutoTargetDialog(
                     border = if (isSelected) {
                         BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
                     } else {
-                        null
+                        BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -395,7 +356,10 @@ fun AutoTargetDialog(
         ) {
             TextButton(
                 onClick = onDismiss,
-                shape = CircleShape,
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
                 modifier = Modifier
                     .heightIn(min = 48.dp)
                     .minimumInteractiveComponentSize()
@@ -418,7 +382,6 @@ fun IntervalPickerDialog(
     onOpenCustomInterval: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val presetRows = remember { IntervalFormatter.presetMinutes.chunked(3) }
     val isCustomActive = selectedMinutes !in IntervalFormatter.presetMinutes
     var minutesText by remember(selectedMinutes, isCustomEntryMode) {
         mutableStateOf(selectedMinutes.toString())
@@ -438,7 +401,7 @@ fun IntervalPickerDialog(
                     R.string.label_interval
                 }
             ),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
 
@@ -507,7 +470,10 @@ fun IntervalPickerDialog(
             }
         } else {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 IntervalFormatter.presetMinutes.forEach { mins ->
@@ -524,7 +490,7 @@ fun IntervalPickerDialog(
                         border = if (isSelected) {
                             BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
                         } else {
-                            null
+                            BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -572,7 +538,7 @@ fun IntervalPickerDialog(
                     border = if (isCustomActive) {
                         BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
                     } else {
-                        null
+                        BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -629,7 +595,10 @@ fun IntervalPickerDialog(
         ) {
             TextButton(
                 onClick = onDismiss,
-                shape = CircleShape,
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
                 modifier = Modifier
                     .heightIn(min = 48.dp)
                     .minimumInteractiveComponentSize()
@@ -648,7 +617,7 @@ fun IntervalPickerDialog(
                         onSelectMinutes(value)
                     },
                     enabled = isValid,
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier
                         .heightIn(min = 48.dp)
                         .minimumInteractiveComponentSize()

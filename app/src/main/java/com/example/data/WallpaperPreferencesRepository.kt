@@ -58,7 +58,8 @@ data class StoredWallpaperState(
     val currentIntricacy: Float? = null,
     val lastAutoExecMillis: Long = 0L,
     val userPalettes: List<ColorPalette> = StarterPalettes.defaults,
-    val history: List<GeneratedHistoryItem> = emptyList()
+    val history: List<GeneratedHistoryItem> = emptyList(),
+    val hasSeenGestureTutorial: Boolean = false
 )
 
 class WallpaperPreferencesRepository(private val context: Context) {
@@ -89,6 +90,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
         val USER_PALETTES_JSON = stringPreferencesKey("user_palettes_json")
         val DELETED_PALETTE_IDS = stringPreferencesKey("deleted_palette_ids")
         val HISTORY_JSON = stringPreferencesKey("history_json")
+        val HAS_SEEN_GESTURE_TUTORIAL = booleanPreferencesKey("has_seen_gesture_tutorial")
     }
 
     val stateFlow: Flow<StoredWallpaperState> = context.applicationContext.rimaluxDataStore.data.map { prefs ->
@@ -105,12 +107,20 @@ class WallpaperPreferencesRepository(private val context: Context) {
             currentIntricacy = prefs[Keys.CURRENT_INTRICACY]?.coerceIn(0.15f, 1.0f),
             lastAutoExecMillis = prefs[Keys.LAST_AUTO_EXEC_MILLIS] ?: 0L,
             userPalettes = palettes,
-            history = decodeHistory(prefs[Keys.HISTORY_JSON])
+            history = decodeHistory(prefs[Keys.HISTORY_JSON]),
+            hasSeenGestureTutorial = prefs[Keys.HAS_SEEN_GESTURE_TUTORIAL] ?: false
         )
     }.flowOn(Dispatchers.IO)
 
     suspend fun getSnapshot(): StoredWallpaperState = withContext(Dispatchers.IO) {
         stateFlow.first()
+    }
+
+    suspend fun setGestureTutorialSeen(seen: Boolean = true) = withContext(Dispatchers.IO) {
+        context.applicationContext.rimaluxDataStore.edit { prefs ->
+            prefs[Keys.HAS_SEEN_GESTURE_TUTORIAL] = seen
+        }
+        Unit
     }
 
     private fun resolveUserPalettes(prefs: Preferences): List<ColorPalette> {

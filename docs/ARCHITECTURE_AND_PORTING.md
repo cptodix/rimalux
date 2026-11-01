@@ -146,13 +146,15 @@ Given a `SynthesizedWallpaper` (or `VectorScene` + `paletteColors` + `pitchBlack
 
 | Screen / Component | `testTag` | Purpose |
 | :--- | :--- | :--- |
-| Studio Canvas | `vector_preview_canvas` | Full-bleed swipe deck & double-tap target |
-| Studio Overlay | `btn_toggle_overlay_top` | Cycles Clean / Lock Screen / Home Icons mockup |
-| Studio Sheet | `home_bottom_sheet`, `bottom_sheet_drag_handle` | Swipe-up settings bottom sheet |
-| True Black Controls | `seg_black_single`, `seg_black_range`, `slider_pitch_black`, `range_slider_pitch_black` | True Black Ratio mode & sliders |
-| Summary Rows | `row_open_patterns`, `row_open_palettes` | Navigates to Patterns / Colors screens |
-| Apply / Export Dialog | `dialog_set_wallpaper_target`, `target_option_<id>`, `btn_save_to_device`, `btn_share_wallpaper` | Double-tap wallpaper apply, lossless PNG save & share |
-| Auto-Change Section | `switch_auto_rotate`, `card_auto_target_picker`, `card_interval_picker`, `btn_auto_change_troubleshoot` | Background schedule controls & help entry |
-| Auto-Change Help | `auto_change_help_screen`, `vendor_chip_<id>`, `btn_open_vendor_settings`, `btn_open_app_info_settings` | OEM battery-saver guide & deep-link shortcuts |
-| Patterns Screen | `btn_weight_mode_normal`, `btn_weight_mode_center`, `btn_patterns_random`, `btn_patterns_multiselect`, `pattern_card_<id>` | Normal/Center Weighted layout & 80-pattern selection |
+| Studio Canvas & Overlays | `vector_preview_canvas`, `preview_info_overlay`, `preview_pending_notice`, `gesture_tutorial_overlay`, `btn_dismiss_tutorial` | Full-bleed swipe deck, double-tap/single-tap/swipe-down target, info pill & translucent gesture tutorial |
+| Phone Mockup Overlays | `mockup_lock_screen_overlay`, `mockup_home_screen_overlay`, `mockup_app_icon_<key>`, `mockup_app_label_<key>` | Realistic Lock Screen & labeled Home Screen preview overlays |
+| Studio Bottom Sheet | `home_settings_sheet`, `home_bottom_sheet_handle`, `home_screen_scroll` | Hidden-when-closed swipe-up settings sheet & floating chevron handle |
+| True Black Controls | `btn_black_mode_single`, `btn_black_mode_range`, `slider_pitch_black_ratio`, `range_slider_pitch_black` | True Black Ratio mode & sliders |
+| Studio Summary & Quick Rows | `pill_open_patterns`, `pill_open_pattern_layout`, `pill_open_palettes`, `pill_open_color_fill`, `btn_like_the_app` | Navigates to Patterns/Colors pages or opens quick Layout/Fill/Appreciation popups |
+| Studio Quick Popups | `dialog_pattern_layout` (`layout_option_normal`, `layout_option_center`), `dialog_color_fill` (`fill_option_solid`, `fill_option_gradient`) | Unified `BasicAlertDialog` popups for Pattern Layout & Color Fill Style |
+| Apply / Export Dialog | `dialog_set_wallpaper_target`, `manual_target_<id>`, `btn_save_to_device`, `btn_share_wallpaper` | Double-tap wallpaper apply (`Home Screen`, `Lock Screen`, `Both`, `Both (Separate)`), lossless PNG save & share |
+| Auto-Change Section & Modals | `switch_auto_rotate`, `pill_open_auto_target`, `pill_open_interval`, `dialog_auto_target`, `dialog_interval_picker`, `dialog_custom_interval`, `btn_auto_change_help` | Background schedule controls (disabled when switch is off), unified target/interval popups & help entry |
+| Auto-Change Help | `auto_change_help_screen`, `btn_not_your_device`, `dialog_select_brand`, `chip_vendor_<id>`, `btn_open_vendor_shortcut`, `btn_open_app_battery_settings` | OEM battery-saver guide, brand picker popup & deep-link shortcuts |
+| Appreciation & Tip Jar | `dialog_like_app`, `btn_dialog_rate_app`, `btn_dialog_send_thanks`, `dialog_send_thanks`, `btn_tip_<amount>` | Enjoying Rimalux? review prompt & single-column direct-action tip jar |
+| Patterns Screen | `patterns_screen_list`, `btn_weight_mode_normal`, `btn_weight_mode_center`, `btn_patterns_random`, `btn_patterns_multiselect`, `chip_pattern_cat_<id>`, `pattern_card_<id>` | Adaptive `LazyVerticalGrid` (`minSize = 160.dp`), Normal/Center Weighted layout & 80-pattern selection |
 | Colors Screen | `fill_mode_solid`, `fill_mode_gradient`, `palette_mode_random`, `palette_mode_list`, `btn_shuffle_random_colors`, `btn_open_create_palette` | Solid/Gradient fill & palette selection/creation |

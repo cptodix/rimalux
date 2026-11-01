@@ -17,7 +17,7 @@ val PlusJakartaSansFontFamily = FontFamily(
 )
 
 // Material Design 3 Type Scale using Plus Jakarta Sans across all 15 tokens,
-// calibrated with calm Normal/Medium weights and airy line heights
+// calibrated for crisp typographic hierarchy across headers, modals, cards, and controls
 val Typography = Typography(
     displayLarge = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
@@ -45,14 +45,14 @@ val Typography = Typography(
         fontWeight = FontWeight.Normal,
         fontSize = 32.sp,
         lineHeight = 40.sp,
-        letterSpacing = (-0.2).sp
+        letterSpacing = 0.sp
     ),
     headlineMedium = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 28.sp,
         lineHeight = 36.sp,
-        letterSpacing = (-0.15).sp
+        letterSpacing = 0.sp
     ),
     headlineSmall = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
@@ -73,7 +73,7 @@ val Typography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 16.sp,
         lineHeight = 24.sp,
-        letterSpacing = 0.1.sp
+        letterSpacing = 0.15.sp
     ),
     titleSmall = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
@@ -87,20 +87,20 @@ val Typography = Typography(
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
-        letterSpacing = 0.2.sp
+        letterSpacing = 0.15.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 21.sp,
+        lineHeight = 20.sp,
         letterSpacing = 0.2.sp
     ),
     bodySmall = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
-        lineHeight = 18.sp,
+        lineHeight = 16.sp,
         letterSpacing = 0.25.sp
     ),
     labelLarge = TextStyle(
