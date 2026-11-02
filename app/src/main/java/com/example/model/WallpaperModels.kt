@@ -1,6 +1,7 @@
 package com.example.model
 
 import android.app.WallpaperManager
+import android.content.Context
 import com.example.R
 import com.example.engine.CoreGenerationSpec
 import com.example.engine.DeepBlackRatioEngine
@@ -54,6 +55,62 @@ enum class MockupOverlayMode {
     NONE,
     LOCK_SCREEN,
     HOME_GRID
+}
+
+enum class StudioGestureAction(
+    val id: String,
+    val variationResIds: List<Int>
+) {
+    SWIPE_LEFT(
+        id = "swipe_left",
+        variationResIds = listOf(
+            R.string.mini_hint_swipe_left_1,
+            R.string.mini_hint_swipe_left_2,
+            R.string.mini_hint_swipe_left_3,
+            R.string.mini_hint_swipe_left_4
+        )
+    ),
+    SWIPE_RIGHT(
+        id = "swipe_right",
+        variationResIds = listOf(
+            R.string.mini_hint_swipe_right_1,
+            R.string.mini_hint_swipe_right_2,
+            R.string.mini_hint_swipe_right_3,
+            R.string.mini_hint_swipe_right_4
+        )
+    ),
+    DOUBLE_TAP(
+        id = "double_tap",
+        variationResIds = listOf(
+            R.string.mini_hint_double_tap_1,
+            R.string.mini_hint_double_tap_2,
+            R.string.mini_hint_double_tap_3,
+            R.string.mini_hint_double_tap_4
+        )
+    ),
+    SWIPE_UP(
+        id = "swipe_up",
+        variationResIds = listOf(
+            R.string.mini_hint_swipe_up_1,
+            R.string.mini_hint_swipe_up_2,
+            R.string.mini_hint_swipe_up_3,
+            R.string.mini_hint_swipe_up_4
+        )
+    ),
+    SWIPE_DOWN(
+        id = "swipe_down",
+        variationResIds = listOf(
+            R.string.mini_hint_swipe_down_1,
+            R.string.mini_hint_swipe_down_2,
+            R.string.mini_hint_swipe_down_3,
+            R.string.mini_hint_swipe_down_4
+        )
+    );
+
+    companion object {
+        fun fromId(id: String): StudioGestureAction? =
+            entries.find { it.id == id }
+    }
 }
 
 data class GeneratorConfig(
@@ -123,6 +180,35 @@ data class GeneratedHistoryItem(
 
 object IntervalFormatter {
     val presetMinutes: List<Int> = listOf(1, 5, 15, 30, 60, 180, 360, 720, 1440)
+
+    fun formatMinutesShort(context: Context, minutes: Int): String {
+        return when {
+            minutes < 60 -> context.getString(R.string.interval_short_minutes, minutes)
+            minutes % 1440 == 0 -> context.getString(R.string.interval_short_days, minutes / 1440)
+            minutes % 60 == 0 -> context.getString(R.string.interval_short_hours, minutes / 60)
+            else -> context.getString(
+                R.string.interval_short_hours_minutes,
+                minutes / 60,
+                minutes % 60
+            )
+        }
+    }
+
+    fun formatMinutesDescriptive(context: Context, minutes: Int): String {
+        val res = context.resources
+        return when {
+            minutes < 60 -> res.getQuantityString(R.plurals.interval_desc_minutes, minutes, minutes)
+            minutes % 1440 == 0 -> {
+                val days = minutes / 1440
+                res.getQuantityString(R.plurals.interval_desc_days, days, days)
+            }
+            minutes % 60 == 0 -> {
+                val hours = minutes / 60
+                res.getQuantityString(R.plurals.interval_desc_hours, hours, hours)
+            }
+            else -> formatMinutesShort(context, minutes)
+        }
+    }
 
     fun formatMinutesShort(minutes: Int): String {
         return when {

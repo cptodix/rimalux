@@ -39,9 +39,7 @@ import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.SignalCellular4Bar
 import androidx.compose.material.icons.rounded.WbSunny
-import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -186,34 +184,30 @@ private val CrispLauncherShadow = Shadow(
 @Composable
 fun LockScreenOverlayMockup(
     bottomClearance: Dp,
+    topClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val statusBarTop = maxOf(WindowInsets.statusBars.asPaddingValues().calculateTopPadding(), 10.dp)
+    val effectiveTopClearance = maxOf(statusBarTop + 64.dp, topClearance)
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .testTag("mockup_lock_screen_overlay")
     ) {
-        val usableHeight = maxHeight - statusBarTop - bottomClearance
-        val showNotifications = usableHeight >= 370.dp
+        val usableHeight = maxHeight - effectiveTopClearance - bottomClearance
+        val showNotifications = usableHeight >= 330.dp
 
-        // Top Status Bar + Lock Clock + Frosted Notification Cards
+        // Lock Clock + Frosted Notification Cards (positioned cleanly below mini-hint clearance)
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .widthIn(max = 420.dp)
                 .fillMaxWidth()
-                .padding(top = statusBarTop, start = 24.dp, end = 24.dp),
+                .padding(top = effectiveTopClearance, start = 24.dp, end = 24.dp)
+                .testTag("mockup_lock_top_header"),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            MockupAndroidStatusBar(
-                leftText = stringResource(R.string.mockup_carrier),
-                modifier = Modifier.testTag("mockup_lock_status_bar")
-            )
-
-            Spacer(modifier = Modifier.height(22.dp))
-
             Icon(
                 imageVector = Icons.Rounded.Lock,
                 contentDescription = null,
@@ -326,41 +320,39 @@ fun LockScreenOverlayMockup(
 
 /**
  * Touch-passthrough realistic Android Home Screen preview overlay.
- * Renders status bar, At-a-Glance date/weather header, frosted search bar,
+ * Renders At-a-Glance date/weather header, frosted search bar,
  * colorful adaptive app icons with app name text labels underneath, page indicator dots,
- * and labeled favorite dock—all strictly clearing the active preview info pill at the bottom.
+ * and labeled favorite dock—all strictly clearing the top mini hint and bottom preview info pill.
  */
 @Composable
 fun HomeGridOverlayMockup(
     bottomClearance: Dp,
+    topClearance: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val statusBarTop = maxOf(WindowInsets.statusBars.asPaddingValues().calculateTopPadding(), 10.dp)
+    val effectiveTopClearance = maxOf(statusBarTop + 64.dp, topClearance)
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .testTag("mockup_home_screen_overlay")
     ) {
-        val usableHeight = maxHeight - statusBarTop - bottomClearance
-        val showSearchPill = usableHeight >= 400.dp
-        val showTwoAppRows = usableHeight >= 460.dp
-        val showOneAppRow = usableHeight >= 340.dp
+        val usableHeight = maxHeight - effectiveTopClearance - bottomClearance
+        val showSearchPill = usableHeight >= 360.dp
+        val showTwoAppRows = usableHeight >= 420.dp
+        val showOneAppRow = usableHeight >= 310.dp
 
-        // Top Launcher Header: Status Bar + At-a-Glance + Search Pill
+        // Top Launcher Header: At-a-Glance + Search Pill (cleanly below mini-hint clearance)
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .widthIn(max = 420.dp)
                 .fillMaxWidth()
-                .padding(top = statusBarTop, start = 24.dp, end = 24.dp),
+                .padding(top = effectiveTopClearance, start = 24.dp, end = 24.dp)
+                .testTag("mockup_home_top_header"),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            MockupAndroidStatusBar(
-                leftText = stringResource(R.string.mockup_clock_status),
-                modifier = Modifier.testTag("mockup_home_status_bar")
-            )
-
             Column(
                 modifier = Modifier
                     .padding(horizontal = 2.dp)
@@ -371,7 +363,6 @@ fun HomeGridOverlayMockup(
                     text = stringResource(R.string.mockup_date_short),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontSize = 19.sp,
-                        fontWeight = FontWeight.Medium,
                         shadow = CrispLauncherShadow
                     ),
                     color = Color.White.copy(alpha = 0.96f)
@@ -388,9 +379,8 @@ fun HomeGridOverlayMockup(
                     )
                     Text(
                         text = stringResource(R.string.mockup_weather),
-                        style = MaterialTheme.typography.bodySmall.copy(
+                        style = MaterialTheme.typography.labelLarge.copy(
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
                             shadow = CrispLauncherShadow
                         ),
                         color = Color.White.copy(alpha = 0.90f)
@@ -457,81 +447,6 @@ fun HomeGridOverlayMockup(
                 apps = HomeDockApps,
                 modifier = Modifier.testTag("mockup_home_dock_row")
             )
-        }
-    }
-}
-
-@Composable
-private fun MockupAndroidStatusBar(
-    leftText: String,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = leftText,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                shadow = CrispLauncherShadow
-            ),
-            color = Color.White.copy(alpha = 0.94f)
-        )
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.SignalCellular4Bar,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.92f),
-                modifier = Modifier.size(13.dp)
-            )
-            Icon(
-                imageVector = Icons.Rounded.Wifi,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.92f),
-                modifier = Modifier.size(13.dp)
-            )
-            Text(
-                text = stringResource(R.string.mockup_battery_pct),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    shadow = CrispLauncherShadow
-                ),
-                color = Color.White.copy(alpha = 0.92f)
-            )
-            // Crisp vector battery capsule
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .width(18.dp)
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(2.5.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(2.5.dp))
-                        .padding(1.5.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.84f)
-                            .height(7.dp)
-                            .clip(RoundedCornerShape(1.dp))
-                            .background(Color.White.copy(alpha = 0.94f))
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .width(1.5.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(topEnd = 1.dp, bottomEnd = 1.dp))
-                        .background(Color.White.copy(alpha = 0.86f))
-                )
-            }
         }
     }
 }
@@ -698,7 +613,6 @@ private fun LockNotificationCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
                     color = Color.White.copy(alpha = 0.95f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

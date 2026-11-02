@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,6 +61,7 @@ import com.example.R
 import com.example.model.ColorFillMode
 import com.example.model.ColorPalette
 import com.example.model.PaletteMode
+import com.example.model.resolveDisplayName
 import com.example.ui.RimaluxUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -310,6 +312,7 @@ private fun PaletteListItemCard(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
     Surface(
         selected = isSelected,
         onClick = onClick,
@@ -336,7 +339,7 @@ private fun PaletteListItemCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = palette.name,
+                    text = palette.resolveDisplayName(context),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )

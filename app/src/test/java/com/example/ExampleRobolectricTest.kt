@@ -34,7 +34,9 @@ import com.example.model.ColorFillMode
 import com.example.model.MockupOverlayMode
 import com.example.model.PatternWeightMode
 import com.example.model.StarterPalettes
+import com.example.model.nameResOrNull
 import com.example.model.previewRes
+import com.example.model.resolveDisplayName
 import com.example.scheduler.OemBackgroundHelper
 import com.example.scheduler.OemVendor
 import com.example.ui.RimaluxScreen
@@ -119,6 +121,10 @@ class ExampleRobolectricTest {
             decoded?.recycle()
         }
         assertTrue("Expected at least 40 curated starter palettes", StarterPalettes.defaults.size >= 40)
+        assertTrue(
+            "Starter palettes must contain Monochromatic OLED palette",
+            StarterPalettes.defaults.any { it.id == "monochromatic_oled" }
+        )
         for (palette in StarterPalettes.defaults) {
             assertTrue(
                 "Starter palette ${palette.id} should contain pure non-black colors",
@@ -717,7 +723,69 @@ class ExampleRobolectricTest {
         assertNotNull("Expected FileProvider stream URI to decode a valid PNG bitmap", sharedBitmap)
         assertEquals(expectedSpec.widthPx, sharedBitmap!!.width)
         assertEquals(expectedSpec.heightPx, sharedBitmap.height)
-        sharedBitmap.recycle()
+
+        // Verify shared PNG contains subtle watermark strictly inside social safe-zone while raw render does not
+        val activePreview = requireNotNull(viewModel.uiState.value.preview)
+        val cleanBitmap = com.example.platform.WallpaperRenderer.renderToBitmap(
+            scene = activePreview.scene,
+            paletteColors = activePreview.colors,
+            pitchBlackRatio = activePreview.pitchBlackRatio,
+            widthPx = expectedSpec.widthPx,
+            heightPx = expectedSpec.heightPx,
+            colorFillMode = activePreview.colorFillMode,
+            densityDpi = expectedSpec.densityDpi
+        )
+        try {
+            val safeZone = com.example.engine.WatermarkPlacementSolver.computeSocialSafeZone(
+                expectedSpec.widthPx,
+                expectedSpec.heightPx
+            )
+            var watermarkPixelCount = 0
+            var outsideSafeZoneDiffCount = 0
+            var maxDeltaOnPureBlack = 0
+            val cleanRow = IntArray(expectedSpec.widthPx)
+            val sharedRow = IntArray(expectedSpec.widthPx)
+            for (y in 0 until expectedSpec.heightPx) {
+                cleanBitmap.getPixels(cleanRow, 0, expectedSpec.widthPx, 0, y, expectedSpec.widthPx, 1)
+                sharedBitmap.getPixels(sharedRow, 0, expectedSpec.widthPx, 0, y, expectedSpec.widthPx, 1)
+                val inSafeY = y in safeZone.topPx..safeZone.bottomPx
+                for (x in 0 until expectedSpec.widthPx) {
+                    val c = cleanRow[x] and 0x00FFFFFF
+                    val s = sharedRow[x] and 0x00FFFFFF
+                    if (c != s) {
+                        watermarkPixelCount += 1
+                        if (!inSafeY || x !in safeZone.leftPx..safeZone.rightPx) {
+                            outsideSafeZoneDiffCount += 1
+                        }
+                        if (c == 0) {
+                            val dr = kotlin.math.abs(((s ushr 16) and 0xFF))
+                            val dg = kotlin.math.abs(((s ushr 8) and 0xFF))
+                            val db = kotlin.math.abs((s and 0xFF))
+                            val peak = maxOf(dr, dg, db)
+                            if (peak > maxDeltaOnPureBlack) {
+                                maxDeltaOnPureBlack = peak
+                            }
+                        }
+                    }
+                }
+            }
+            assertTrue(
+                "Expected shared PNG to render watermark glyphs (>0 modified pixels), got $watermarkPixelCount",
+                watermarkPixelCount > 25
+            )
+            assertEquals(
+                "Watermark pixels must never spill outside social media safe zone ($safeZone)",
+                0,
+                outsideSafeZoneDiffCount
+            )
+            assertTrue(
+                "Watermark on #000000 must stay barely noticeable (peak RGB <= 60), got $maxDeltaOnPureBlack",
+                maxDeltaOnPureBlack <= 60
+            )
+        } finally {
+            cleanBitmap.recycle()
+            sharedBitmap.recycle()
+        }
     }
 
     @Test
@@ -1050,7 +1118,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun realisticPhoneMockupOverlays_renderLabeledHomeAppsAndLockShortcuts_withoutHittingPreviewInfoOverlay() {
+    fun realisticPhoneMockupOverlays_removeStatusBars_andNeverHitMiniHintOrPreviewInfoOverlay() {
         composeTestRule.waitForIdle()
         val activity = composeTestRule.activity
         val viewModel = ViewModelProvider(
@@ -1059,20 +1127,36 @@ class ExampleRobolectricTest {
         )[RimaluxViewModel::class.java]
 
         awaitPreviewReady(viewModel)
+        // Dismiss initial Hint Window so idle mini hint can appear over mockups
+        if (viewModel.uiState.value.isGestureTutorialVisible) {
+            composeTestRule.onNodeWithTag("btn_dismiss_tutorial").performClick()
+            composeTestRule.waitForIdle()
+        }
 
-        // 1. Swipe down -> Lock Screen overlay
+        // 1. Swipe down -> Lock Screen overlay (status bar removed)
         composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
             swipeDown(startY = height * 0.25f, endY = height * 0.75f, durationMillis = 180L)
         }
         composeTestRule.waitForIdle()
         assertEquals(MockupOverlayMode.LOCK_SCREEN, viewModel.uiState.value.mockupMode)
         composeTestRule.onNodeWithTag("mockup_lock_screen_overlay").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("mockup_lock_status_bar").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mockup_lock_status_bar").assertDoesNotExist()
         composeTestRule.onNodeWithText("09:41").assertIsDisplayed()
         composeTestRule.onNodeWithText("Design Sync").assertIsDisplayed()
         composeTestRule.onNodeWithText("Alex Rivera").assertIsDisplayed()
         composeTestRule.onNodeWithTag("mockup_lock_bottom_shortcuts").assertIsDisplayed()
         composeTestRule.onNodeWithTag("preview_info_overlay").assertIsDisplayed()
+
+        // Wait 4s idle so top mini hint shows over Lock Screen overlay -> verify zero overlap
+        composeTestRule.mainClock.advanceTimeBy(4_200L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("studio_mini_hint").assertIsDisplayed()
+        val miniHintOnLockBounds = composeTestRule.onNodeWithTag("studio_mini_hint").fetchSemanticsNode().boundsInRoot
+        val lockTopHeaderBounds = composeTestRule.onNodeWithTag("mockup_lock_top_header").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Mini hint (${miniHintOnLockBounds.bottom}) must never hit Lock Screen top header (${lockTopHeaderBounds.top})",
+            miniHintOnLockBounds.bottom <= lockTopHeaderBounds.top - 4f
+        )
 
         val lockShortcutsBounds = composeTestRule.onNodeWithTag("mockup_lock_bottom_shortcuts").fetchSemanticsNode().boundsInRoot
         val infoBoundsOnLock = composeTestRule.onNodeWithTag("preview_info_overlay").fetchSemanticsNode().boundsInRoot
@@ -1081,17 +1165,28 @@ class ExampleRobolectricTest {
             lockShortcutsBounds.bottom <= infoBoundsOnLock.top - 4f
         )
 
-        // 2. Swipe down -> Home Screen overlay with realistic app icons + app name labels underneath
+        // 2. Swipe down -> Home Screen overlay (status bar removed, realistic app icons + labels)
         composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
             swipeDown(startY = height * 0.25f, endY = height * 0.75f, durationMillis = 180L)
         }
         composeTestRule.waitForIdle()
         assertEquals(MockupOverlayMode.HOME_GRID, viewModel.uiState.value.mockupMode)
         composeTestRule.onNodeWithTag("mockup_home_screen_overlay").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("mockup_home_status_bar").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mockup_home_status_bar").assertDoesNotExist()
         composeTestRule.onNodeWithTag("mockup_home_at_a_glance").assertIsDisplayed()
         composeTestRule.onNodeWithTag("mockup_home_search_bar").assertIsDisplayed()
         composeTestRule.onNodeWithTag("mockup_home_bottom_cluster").assertIsDisplayed()
+
+        // Wait 4s idle so top mini hint shows over Home Screen overlay -> verify zero overlap
+        composeTestRule.mainClock.advanceTimeBy(4_200L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("studio_mini_hint").assertIsDisplayed()
+        val miniHintOnHomeBounds = composeTestRule.onNodeWithTag("studio_mini_hint").fetchSemanticsNode().boundsInRoot
+        val homeAtAGlanceBounds = composeTestRule.onNodeWithTag("mockup_home_at_a_glance").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Mini hint (${miniHintOnHomeBounds.bottom}) must never hit Home Screen At-a-Glance (${homeAtAGlanceBounds.top})",
+            miniHintOnHomeBounds.bottom <= homeAtAGlanceBounds.top - 4f
+        )
 
         val expectedApps = listOf(
             "calendar" to "Calendar",
@@ -1141,7 +1236,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun firstOpenGestureTutorial_autoShowsOnce_persistsDismissal_andReopensViaSingleTapOrBottomSheetGuide() {
+    fun hintWindowAndIdleMiniHint_trackSuccessfulGestures_rotateStaleHints_dismissOnAnyAction_andOpenHintWindowOnClick() {
         composeTestRule.waitForIdle()
         val activity = composeTestRule.activity
         val viewModel = ViewModelProvider(
@@ -1151,7 +1246,7 @@ class ExampleRobolectricTest {
 
         awaitPreviewReady(viewModel, requireAheadBuffer = true)
 
-        // 1. Active automatically on first app open (translucent modal, no title or Got It button)
+        // 1. Hint Window auto-opens on first launch with darker card & simple "Got It" TextButton (no title)
         assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
         composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertIsDisplayed()
         composeTestRule.onNodeWithTag("gesture_tutorial_card").assertIsDisplayed()
@@ -1160,84 +1255,408 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithText("Double-Tap").assertIsDisplayed()
         composeTestRule.onNodeWithText("Swipe Up").assertIsDisplayed()
         composeTestRule.onNodeWithText("Swipe Down").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Got It").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("btn_dismiss_tutorial").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Got It").assertIsDisplayed()
 
-        // Attempting to dismiss within 800ms of showing must be ignored
-        viewModel.dismissGestureTutorial()
+        // Tapping anywhere on canvas must NOT dismiss the Hint Window
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performClick()
+        composeTestRule.mainClock.advanceTimeBy(400L)
         composeTestRule.waitForIdle()
-        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
+        assertTrue("Tap anywhere must not dismiss Hint Window", viewModel.uiState.value.isGestureTutorialVisible)
+        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertIsDisplayed()
 
-        // 2. Dismiss after 800ms minimum display guard -> leaves preview clean and persists to DataStore
-        Thread.sleep(850L)
-        viewModel.dismissGestureTutorial()
+        // Clicking "Got It" TextButton dismisses Hint Window and persists hasSeenGestureTutorial = true
+        composeTestRule.onNodeWithTag("btn_dismiss_tutorial").performClick()
         composeTestRule.waitForIdle()
         assertFalse(viewModel.uiState.value.isGestureTutorialVisible)
         composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertDoesNotExist()
 
         val repo = com.example.data.WallpaperPreferencesRepository(activity)
         val storedAfterDismiss = kotlinx.coroutines.runBlocking { repo.getSnapshot() }
-        assertTrue("Dismissing tutorial must persist hasSeenGestureTutorial = true", storedAfterDismiss.hasSeenGestureTutorial)
+        assertTrue("Dismissing Hint Window must persist hasSeenGestureTutorial = true", storedAfterDismiss.hasSeenGestureTutorial)
 
-        // Subsequent cold start ViewModel must NOT auto-open tutorial
-        val secondSessionVm = RimaluxViewModel(activity, repo)
-        val reloadDeadline = System.currentTimeMillis() + 5_000L
-        while (System.currentTimeMillis() < reloadDeadline && secondSessionVm.uiState.value.preview == null) {
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(15L)
-        }
-        assertFalse(
-            "Tutorial must remain hidden on subsequent app launches once seen",
-            secondSessionVm.uiState.value.isGestureTutorialVisible
-        )
-
-        // 3. Forgot later: Single-tap clean preview toggles minimalist hint without permanent UI clutter
+        // Single-tapping canvas must NO LONGER show Hint Window
         composeTestRule.onNodeWithTag("vector_preview_canvas").performClick()
         composeTestRule.mainClock.advanceTimeBy(400L)
         composeTestRule.waitForIdle()
-        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
-        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertIsDisplayed()
-
-        // Tap before 800ms is ignored
-        composeTestRule.onNodeWithTag("vector_preview_canvas").performClick()
-        composeTestRule.mainClock.advanceTimeBy(200L)
-        composeTestRule.waitForIdle()
-        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
-
-        // Tap after 800ms dismisses hint
-        Thread.sleep(850L)
-        composeTestRule.onNodeWithTag("vector_preview_canvas").performClick()
-        composeTestRule.mainClock.advanceTimeBy(400L)
-        composeTestRule.waitForIdle()
-        assertFalse(viewModel.uiState.value.isGestureTutorialVisible)
+        assertFalse("Single-tap must not open Hint Window", viewModel.uiState.value.isGestureTutorialVisible)
         composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertDoesNotExist()
 
-        // 4. Bottom sheet must NOT contain gesture guide button (removed per user request to keep sheet clean)
-        composeTestRule.onNodeWithTag("home_bottom_sheet_handle").performClick()
+        // 2. Idle < 4 seconds -> mini hint must stay hidden; >= 4 seconds -> mini hint shows on top!
+        composeTestRule.mainClock.advanceTimeBy(3_500L)
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("home_settings_sheet").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("btn_reopen_tutorial").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("studio_mini_hint").assertDoesNotExist()
 
-        // Close bottom sheet
-        composeTestRule.onNodeWithTag("home_bottom_sheet_handle").performClick()
-        composeTestRule.mainClock.advanceTimeBy(300L)
+        composeTestRule.mainClock.advanceTimeBy(700L)
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("home_settings_sheet").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("studio_mini_hint").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("studio_mini_hint_text", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("studio_mini_hint_icons", useUnmergedTree = true).assertIsDisplayed()
+        repeat(4) { idx ->
+            composeTestRule.onNodeWithTag("studio_mini_hint_icon_$idx", useUnmergedTree = true).assertIsDisplayed()
+        }
 
-        // Reopen tutorial via viewModel for swipe dismissal verification
-        viewModel.reopenGestureTutorial()
+        // Verify hint text is left-aligned and animated palette icons are right-aligned
+        val textBounds = composeTestRule.onNodeWithTag("studio_mini_hint_text", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val iconsBounds = composeTestRule.onNodeWithTag("studio_mini_hint_icons", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Mini hint text (${textBounds.right}) must sit cleanly to the left of right-aligned icons (${iconsBounds.left})",
+            textBounds.left < iconsBounds.left && textBounds.right <= iconsBounds.left + 1f
+        )
+
+        val firstMiniHint = requireNotNull(viewModel.uiState.value.activeMiniHint)
+
+        // 3. Rotate mini hint every 6 seconds
+        composeTestRule.mainClock.advanceTimeBy(6_100L)
         composeTestRule.waitForIdle()
-        assertTrue(viewModel.uiState.value.isGestureTutorialVisible)
+        val secondMiniHint = requireNotNull(viewModel.uiState.value.activeMiniHint)
+        assertNotEquals(
+            "Mini hint must rotate to another stale gesture after 3 seconds",
+            firstMiniHint.action,
+            secondMiniHint.action
+        )
+
+        // 4. Right-edge bounce (unsuccessful swipe right when history is empty) closes mini hint,
+        //    but does NOT mark SWIPE_RIGHT as performed!
+        assertFalse(viewModel.uiState.value.canSwipeRight)
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeRight(startX = width * 0.15f, endX = width * 0.85f, durationMillis = 180L)
+        }
+        composeTestRule.waitForIdle()
+        assertEquals(null, viewModel.uiState.value.activeMiniHint)
+        composeTestRule.onNodeWithTag("studio_mini_hint").assertDoesNotExist()
+        assertEquals(
+            "Unsuccessful right-edge bounce must not record SWIPE_RIGHT timestamp",
+            0L,
+            viewModel.uiState.value.lastGestureTimestamps[com.example.model.StudioGestureAction.SWIPE_RIGHT] ?: 0L
+        )
+
+        // 5. Clicking mini hint opens Hint Window
+        composeTestRule.mainClock.advanceTimeBy(4_200L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("studio_mini_hint").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("studio_mini_hint").performClick()
+        composeTestRule.waitForIdle()
+        assertTrue("Clicking mini hint must open Hint Window", viewModel.uiState.value.isGestureTutorialVisible)
         composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("studio_mini_hint").assertDoesNotExist()
 
-        // 5. Performing any gesture directly through the tutorial after 800ms executes immediately and auto-dismisses hint
-        Thread.sleep(850L)
-        val seedBeforeSwipe = requireNotNull(viewModel.uiState.value.preview).seed
+        // Close Hint Window via Got It TextButton
+        composeTestRule.onNodeWithTag("btn_dismiss_tutorial").performClick()
+        composeTestRule.waitForIdle()
+        assertFalse(viewModel.uiState.value.isGestureTutorialVisible)
+
+        // 6. Perform all 5 gestures successfully -> verify each records timestamp & suppresses mini hint (< 1 week)
+        val seedStart = requireNotNull(viewModel.uiState.value.preview).seed
+        // (a) Swipe Left
         composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
             swipeLeft(startX = width * 0.85f, endX = width * 0.15f, durationMillis = 180L)
         }
-        awaitPreviewReady(viewModel, previousSeed = seedBeforeSwipe)
-        assertFalse(viewModel.uiState.value.isGestureTutorialVisible)
-        composeTestRule.onNodeWithTag("gesture_tutorial_overlay").assertDoesNotExist()
-        assertNotEquals(seedBeforeSwipe, viewModel.uiState.value.preview?.seed)
+        awaitPreviewReady(viewModel, previousSeed = seedStart)
+        assertTrue((viewModel.uiState.value.lastGestureTimestamps[com.example.model.StudioGestureAction.SWIPE_LEFT] ?: 0L) > 0L)
+
+        // (b) Swipe Right (now succeeds because pastStack has seedStart!)
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeRight(startX = width * 0.15f, endX = width * 0.85f, durationMillis = 180L)
+        }
+        composeTestRule.waitForIdle()
+        assertTrue((viewModel.uiState.value.lastGestureTimestamps[com.example.model.StudioGestureAction.SWIPE_RIGHT] ?: 0L) > 0L)
+
+        // (c) Double-Tap
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            doubleClick(center)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_set_wallpaper_target").assertIsDisplayed()
+        assertTrue((viewModel.uiState.value.lastGestureTimestamps[com.example.model.StudioGestureAction.DOUBLE_TAP] ?: 0L) > 0L)
+        composeTestRule.onNodeWithTag("btn_cancel_set_wallpaper").performClick()
+        composeTestRule.waitForIdle()
+
+        // (d) Swipe Up
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeUp(startY = height * 0.78f, endY = height * 0.22f, durationMillis = 180L)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("home_settings_sheet").assertIsDisplayed()
+        assertTrue((viewModel.uiState.value.lastGestureTimestamps[com.example.model.StudioGestureAction.SWIPE_UP] ?: 0L) > 0L)
+        composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeTestRule.mainClock.advanceTimeBy(300L)
+        composeTestRule.waitForIdle()
+
+        // (e) Swipe Down
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeDown(startY = height * 0.25f, endY = height * 0.75f, durationMillis = 180L)
+        }
+        composeTestRule.waitForIdle()
+        assertTrue((viewModel.uiState.value.lastGestureTimestamps[com.example.model.StudioGestureAction.SWIPE_DOWN] ?: 0L) > 0L)
+
+        // Since all 5 gestures were performed within the last week, mini hint must NOT appear after 2s or 5s idle!
+        assertTrue(viewModel.eligibleStaleGestures().isEmpty())
+        composeTestRule.mainClock.advanceTimeBy(5_500L)
+        composeTestRule.waitForIdle()
+        assertEquals(null, viewModel.uiState.value.activeMiniHint)
+        composeTestRule.onNodeWithTag("studio_mini_hint").assertDoesNotExist()
+
+        // 7. Verify > 1 week (> 7 days) staleness filter & multiple variations per gesture across sessions
+        val fakeNow = 1_800_000_000_000L
+        val twoDaysAgo = fakeNow - (2L * 24L * 60L * 60L * 1_000L)
+        val eightDaysAgo = fakeNow - (8L * 24L * 60L * 60L * 1_000L)
+        kotlinx.coroutines.runBlocking {
+            repo.setGestureTimestamps(
+                mapOf(
+                    com.example.model.StudioGestureAction.SWIPE_LEFT to twoDaysAgo,
+                    com.example.model.StudioGestureAction.SWIPE_RIGHT to eightDaysAgo,
+                    com.example.model.StudioGestureAction.DOUBLE_TAP to twoDaysAgo,
+                    com.example.model.StudioGestureAction.SWIPE_UP to eightDaysAgo,
+                    com.example.model.StudioGestureAction.SWIPE_DOWN to twoDaysAgo
+                )
+            )
+        }
+
+        val weekLaterVm = RimaluxViewModel(activity, repo, clockMillis = { fakeNow })
+        val reloadDeadline = System.currentTimeMillis() + 5_000L
+        while (System.currentTimeMillis() < reloadDeadline && weekLaterVm.uiState.value.preview == null) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(15L)
+        }
+        val staleActions = weekLaterVm.eligibleStaleGestures(fakeNow)
+        assertEquals(
+            listOf(
+                com.example.model.StudioGestureAction.SWIPE_RIGHT,
+                com.example.model.StudioGestureAction.SWIPE_UP
+            ),
+            staleActions
+        )
+        assertTrue(weekLaterVm.showMiniHintAfterIdle())
+        val firstStale = requireNotNull(weekLaterVm.uiState.value.activeMiniHint)
+        assertEquals(com.example.model.StudioGestureAction.SWIPE_RIGHT, firstStale.action)
+
+        assertTrue(weekLaterVm.rotateMiniHint())
+        val secondStale = requireNotNull(weekLaterVm.uiState.value.activeMiniHint)
+        assertEquals(com.example.model.StudioGestureAction.SWIPE_UP, secondStale.action)
+
+        assertTrue(weekLaterVm.rotateMiniHint())
+        val thirdStale = requireNotNull(weekLaterVm.uiState.value.activeMiniHint)
+        assertEquals(com.example.model.StudioGestureAction.SWIPE_RIGHT, thirdStale.action)
+        assertNotEquals(
+            "Subsequent rotation back to SWIPE_RIGHT should cycle to its next playful variation",
+            firstStale.messageRes,
+            thirdStale.messageRes
+        )
+
+        // 8. Verify 4-dot vertical glide offset & o->O->O->o scale trajectory for Swipe Down vs Swipe Up
+        val maxOff = 10f
+        // Swipe Down: starts above (-maxOff) small 'o', swells to 'O', glides down to (+maxOff), settles to 'o'
+        assertEquals(-maxOff, com.example.ui.components.computeVerticalSwipeDotTranslationY(0.02f, goingDown = true, maxOffsetPx = maxOff), 0.01f)
+        assertEquals(-maxOff, com.example.ui.components.computeVerticalSwipeDotTranslationY(0.21f, goingDown = true, maxOffsetPx = maxOff), 0.01f)
+        assertTrue(com.example.ui.components.computeVerticalSwipeDotScale(0.21f) > com.example.ui.components.computeVerticalSwipeDotScale(0.02f) + 0.4f)
+        assertEquals(0f, com.example.ui.components.computeVerticalSwipeDotTranslationY(0.41f, goingDown = true, maxOffsetPx = maxOff), 0.1f)
+        assertEquals(maxOff, com.example.ui.components.computeVerticalSwipeDotTranslationY(0.62f, goingDown = true, maxOffsetPx = maxOff), 0.01f)
+        assertTrue(com.example.ui.components.computeVerticalSwipeDotScale(0.62f) > com.example.ui.components.computeVerticalSwipeDotScale(0.83f) + 0.4f)
+
+        // Swipe Up: starts below (+maxOff) small 'o', swells to 'O', glides up to (-maxOff), settles to 'o'
+        assertEquals(maxOff, com.example.ui.components.computeVerticalSwipeDotTranslationY(0.02f, goingDown = false, maxOffsetPx = maxOff), 0.01f)
+        assertEquals(-maxOff, com.example.ui.components.computeVerticalSwipeDotTranslationY(0.62f, goingDown = false, maxOffsetPx = maxOff), 0.01f)
+    }
+
+    @Test
+    fun shareWatermark_formatsPatternNameAndDynamicallyLandsInEmptyDarkSpotInsideSafeZone() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val formattedText = context.getString(R.string.share_watermark_text, "Silk Flow Ribbons")
+        assertEquals("Procedurally generated by Rimalux · Silk Flow Ribbons", formattedText)
+
+        val width = 1080
+        val height = 2400
+        val safe = com.example.engine.WatermarkPlacementSolver.computeSocialSafeZone(width, height)
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        try {
+            // Paint bright artwork everywhere except a pure #000000 dark pocket in the upper-right of the safe zone
+            val canvas = android.graphics.Canvas(bitmap)
+            canvas.drawColor(0xFF3A86FF.toInt())
+            val darkPaint = android.graphics.Paint().apply {
+                color = 0xFF000000.toInt()
+                style = android.graphics.Paint.Style.FILL
+            }
+            val pocketLeft = safe.rightPx - 460
+            val pocketRight = safe.rightPx - 8
+            val pocketTop = safe.topPx + 18
+            val pocketBottom = safe.topPx + 130
+            canvas.drawRect(
+                pocketLeft.toFloat(),
+                pocketTop.toFloat(),
+                pocketRight.toFloat(),
+                pocketBottom.toFloat(),
+                darkPaint
+            )
+
+            val placement = com.example.platform.WallpaperExporter.applyShareWatermark(
+                context = context,
+                bitmap = bitmap,
+                patternTitle = "Silk Flow Ribbons",
+                paletteColors = listOf(0xFF00F5D4L, 0xFF3A86FFL)
+            )
+
+            assertTrue(placement.leftPx >= safe.leftPx.toFloat())
+            assertTrue(placement.leftPx + placement.widthPx <= safe.rightPx.toFloat() + 0.5f)
+            assertTrue(placement.topPx >= safe.topPx.toFloat())
+            assertTrue(placement.topPx + placement.heightPx <= safe.bottomPx.toFloat() + 0.5f)
+
+            assertTrue(
+                "Expected watermark X (${placement.leftPx}..${placement.leftPx + placement.widthPx}) inside dark pocket [$pocketLeft..$pocketRight]",
+                placement.leftPx >= pocketLeft - 10f && placement.leftPx + placement.widthPx <= pocketRight + 10f
+            )
+            assertTrue(
+                "Expected watermark Y (${placement.topPx}..${placement.topPx + placement.heightPx}) inside dark pocket [$pocketTop..$pocketBottom]",
+                placement.topPx >= pocketTop - 10f && placement.topPx + placement.heightPx <= pocketBottom + 10f
+            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Test
+    fun bottomSheetAboutFooter_displaysVersionOnePointZeroPointZeroAndStudioCreditAtBottom() {
+        assertEquals("1.0.0", BuildConfig.VERSION_NAME)
+
+        composeTestRule.waitForIdle()
+        val viewModel = ViewModelProvider(
+            composeTestRule.activity,
+            RimaluxViewModel.Factory(composeTestRule.activity)
+        )[RimaluxViewModel::class.java]
+        awaitPreviewReady(viewModel)
+
+        composeTestRule.onNodeWithTag("home_bottom_sheet_handle").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("home_screen_scroll")
+            .performScrollToNode(hasTestTag("sheet_about_footer"))
+        composeTestRule.waitForIdle()
+
+        val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val expectedText = "Rimalux v1.0.0 by Cptodix Studio @$currentYear"
+        composeTestRule.onNodeWithTag("sheet_about_footer").assertIsDisplayed()
+        composeTestRule.onNodeWithText(expectedText).assertIsDisplayed()
+    }
+
+    @Test
+    fun multiLanguageReadiness_resolvesSystemLocaleWithFallback_andRendersSelectorBetweenLikeAppAndAbout() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        // 1. Only en-US is currently shipped (no extra languages added yet)
+        assertEquals(listOf(com.example.model.AppLanguage.EN_US), com.example.model.AppLanguage.entries)
+        assertEquals("en-US", com.example.model.AppLanguage.DEFAULT.languageTag)
+
+        // 2. First-launch resolution with unsupported system locales falls back cleanly to en-US and persists
+        com.example.platform.AppLocaleManager.clearStoredLanguageForTesting(context)
+        val resolvedFromUnsupported = com.example.platform.AppLocaleManager.resolveOrInitializeLanguage(
+            context = context,
+            systemLocalesOverride = listOf(java.util.Locale.JAPAN, java.util.Locale.GERMANY)
+        )
+        assertEquals(com.example.model.AppLanguage.EN_US, resolvedFromUnsupported)
+
+        // 3. BCP-47 3-tier negotiation engine is ready for future multi-language expansion
+        val futureSupported = listOf("en-US", "fr", "pt-PT", "pt-BR", "zh-Hans", "zh-Hant", "id", "he")
+        assertEquals(
+            "pt-BR",
+            com.example.model.AppLanguage.resolveBestSupportedTag(
+                systemLocales = listOf(java.util.Locale.forLanguageTag("pt-BR")),
+                supportedTags = futureSupported
+            )
+        )
+        assertEquals(
+            "zh-Hans",
+            com.example.model.AppLanguage.resolveBestSupportedTag(
+                systemLocales = listOf(java.util.Locale.SIMPLIFIED_CHINESE),
+                supportedTags = futureSupported
+            )
+        )
+        assertEquals(
+            "zh-Hant",
+            com.example.model.AppLanguage.resolveBestSupportedTag(
+                systemLocales = listOf(java.util.Locale.forLanguageTag("zh-HK")),
+                supportedTags = futureSupported
+            )
+        )
+        assertEquals(
+            "id",
+            com.example.model.AppLanguage.resolveBestSupportedTag(
+                systemLocales = listOf(java.util.Locale("in", "ID")),
+                supportedTags = futureSupported
+            )
+        )
+        assertEquals(
+            "fr",
+            com.example.model.AppLanguage.resolveBestSupportedTag(
+                systemLocales = listOf(
+                    java.util.Locale.KOREA,
+                    java.util.Locale.CANADA_FRENCH
+                ),
+                supportedTags = futureSupported
+            )
+        )
+        assertEquals(
+            "en-US",
+            com.example.model.AppLanguage.resolveBestSupportedTag(
+                systemLocales = listOf(java.util.Locale.forLanguageTag("sv-SE")),
+                supportedTags = futureSupported
+            )
+        )
+
+        // 4. Every built-in starter palette maps to a localized @StringRes entry
+        for (starter in StarterPalettes.defaults) {
+            val resId = starter.nameResOrNull
+            assertNotNull("Starter palette '${starter.id}' must map to @StringRes", resId)
+            val resolvedName = starter.resolveDisplayName(context)
+            assertTrue(resolvedName.isNotBlank())
+        }
+
+        // 5. Verify low-emphasis Language selector sits strictly between Enjoying Rimalux? and About text
+        composeTestRule.waitForIdle()
+        val activity = composeTestRule.activity
+        val viewModel = ViewModelProvider(
+            activity,
+            RimaluxViewModel.Factory(activity)
+        )[RimaluxViewModel::class.java]
+        awaitPreviewReady(viewModel)
+
+        composeTestRule.onNodeWithTag("home_bottom_sheet_handle").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("home_screen_scroll")
+            .performScrollToNode(hasTestTag("sheet_about_footer"))
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("btn_like_the_app").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("btn_open_language_selector").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("sheet_about_footer").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Language · English (US)").assertIsDisplayed()
+
+        val likeBounds = composeTestRule.onNodeWithTag("btn_like_the_app").fetchSemanticsNode().boundsInRoot
+        val langBounds = composeTestRule.onNodeWithTag("btn_open_language_selector").fetchSemanticsNode().boundsInRoot
+        val aboutBounds = composeTestRule.onNodeWithTag("sheet_about_footer").fetchSemanticsNode().boundsInRoot
+
+        assertTrue(
+            "Language selector (${langBounds.top}) must sit below Enjoying Rimalux? (${likeBounds.bottom})",
+            langBounds.top >= likeBounds.bottom - 1f
+        )
+        assertTrue(
+            "About text (${aboutBounds.top}) must sit below Language selector (${langBounds.bottom})",
+            aboutBounds.top >= langBounds.bottom - 1f
+        )
+
+        // 6. Tap Language selector -> opens unified Language modal with English (US) selected
+        composeTestRule.onNodeWithTag("btn_open_language_selector").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("dialog_language_selector").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("language_option_en-us").assertIsDisplayed()
+        composeTestRule.onNode(
+            hasText("English (US)") and hasAnyAncestor(hasTestTag("dialog_language_selector"))
+        ).assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("language_option_en-us").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("dialog_language_selector").assertDoesNotExist()
+        assertEquals(com.example.model.AppLanguage.EN_US, viewModel.uiState.value.appLanguage)
     }
 }

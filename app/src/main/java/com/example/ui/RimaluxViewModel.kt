@@ -16,6 +16,7 @@ import com.example.engine.MathPatternGenerator
 import com.example.engine.SceneRatioStats
 import com.example.engine.VectorScene
 import com.example.engine.WallpaperGeneratorEngine
+import com.example.model.AppLanguage
 import com.example.model.ArtPattern
 import com.example.model.ColorFillMode
 import com.example.model.ColorPalette
@@ -26,16 +27,20 @@ import com.example.model.MockupOverlayMode
 import com.example.model.PaletteMode
 import com.example.model.PatternWeightMode
 import com.example.model.PitchBlackMode
+import androidx.annotation.StringRes
 import com.example.model.RandomPaletteGenerator
 import com.example.model.StarterPalettes
+import com.example.model.StudioGestureAction
 import com.example.model.WallpaperTarget
 import com.example.model.titleRes
+import com.example.platform.AppLocaleManager
 import com.example.platform.WallpaperApplyResult
 import com.example.platform.WallpaperExporter
 import com.example.platform.WallpaperRenderer
 import com.example.platform.WallpaperSaveResult
 import com.example.platform.WallpaperShareResult
 import com.example.scheduler.WallpaperScheduler
+import java.util.EnumMap
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -88,6 +93,13 @@ data class RenderedPreviewSnapshot(
 }
 
 @Immutable
+data class StudioMiniHintState(
+    val action: StudioGestureAction,
+    val variationIndex: Int,
+    @param:StringRes val messageRes: Int
+)
+
+@Immutable
 data class RimaluxUiState(
     val currentScreen: RimaluxScreen = RimaluxScreen.HOME,
     val config: GeneratorConfig = GeneratorConfig(),
@@ -117,16 +129,26 @@ data class RimaluxUiState(
     val isSendThanksDialogOpen: Boolean = false,
     val isPatternLayoutDialogOpen: Boolean = false,
     val isColorFillDialogOpen: Boolean = false,
-    val isGestureTutorialVisible: Boolean = false
+    val isLanguageDialogOpen: Boolean = false,
+    val appLanguage: AppLanguage = AppLanguage.DEFAULT,
+    val pendingLocaleRefreshToken: Long = 0L,
+    val isGestureTutorialVisible: Boolean = false,
+    val activeMiniHint: StudioMiniHintState? = null,
+    val lastGestureTimestamps: Map<StudioGestureAction, Long> = emptyMap(),
+    val previewActivityEpoch: Long = 0L
 )
 
 class RimaluxViewModel(
     private val appContext: Context,
-    private val repository: WallpaperPreferencesRepository = WallpaperPreferencesRepository(appContext)
+    private val repository: WallpaperPreferencesRepository = WallpaperPreferencesRepository(appContext),
+    private val clockMillis: () -> Long = { System.currentTimeMillis() }
 ) : ViewModel() {
 
     companion object {
         const val PREFETCH_AHEAD_TARGET = 3
+        const val MINI_HINT_IDLE_DELAY_MS = 4_000L
+        const val MINI_HINT_ROTATE_INTERVAL_MS = 6_000L
+        const val GESTURE_STALE_THRESHOLD_MS = 7L * 24L * 60L * 60L * 1_000L
         private const val MAX_PAST_STACK = 24
         private const val MAX_RENDERED_CACHE = 8
     }
@@ -136,8 +158,15 @@ class RimaluxViewModel(
         (h.toFloat() / w.toFloat()).coerceIn(0.55f, 2.8f)
     }
 
-    private val _uiState = MutableStateFlow(RimaluxUiState())
+    private val _uiState = MutableStateFlow(
+        RimaluxUiState(
+            appLanguage = AppLocaleManager.resolveOrInitializeLanguage(appContext)
+        )
+    )
     val uiState: StateFlow<RimaluxUiState> = _uiState.asStateFlow()
+
+    private val localizedContext: Context
+        get() = AppLocaleManager.createLocalizedContext(appContext, _uiState.value.appLanguage)
 
     // Deck state (mutated on Main dispatcher inside viewModelScope / UI callbacks)
     private val pastStack = ArrayDeque<GeneratedHistoryItem>()
@@ -151,7 +180,9 @@ class RimaluxViewModel(
     private var hasInitializedFromStorage = false
     private var hasVerifiedInitialSchedule = false
     private var hasDismissedTutorialThisSession = false
-    private var tutorialShownTimestampMs = 0L
+    private var miniHintActionCursor = 0
+    private val miniHintVariationCursors = EnumMap<StudioGestureAction, Int>(StudioGestureAction::class.java)
+    private val pendingGestureWrites = EnumMap<StudioGestureAction, Long>(StudioGestureAction::class.java)
     private var lastObservedAutoExecMillis = 0L
     private var isExecutingScheduledTick = false
     private var pendingRandomColors: List<Long>? = null
@@ -184,8 +215,19 @@ class RimaluxViewModel(
                     }
 
                     val showInitialTutorial = !stored.hasSeenGestureTutorial && !hasDismissedTutorialThisSession
-                    if (showInitialTutorial) {
-                        tutorialShownTimestampMs = System.currentTimeMillis()
+                    val initialTimestamps = StudioGestureAction.entries.associateWith { action ->
+                        pendingGestureWrites[action] ?: (stored.lastGestureTimestamps[action] ?: 0L)
+                    }
+                    val resolvedLanguage = if (stored.appLanguageTag.isNullOrBlank()) {
+                        val initial = AppLocaleManager.resolveOrInitializeLanguage(appContext)
+                        viewModelScope.launch {
+                            repository.setAppLanguageTag(initial.languageTag)
+                        }
+                        initial
+                    } else {
+                        val storedLang = AppLanguage.fromTagOrDefault(stored.appLanguageTag)
+                        AppLocaleManager.setSelectedLanguage(appContext, storedLang)
+                        storedLang
                     }
 
                     _uiState.update { state ->
@@ -194,7 +236,9 @@ class RimaluxViewModel(
                             userPalettes = stored.userPalettes,
                             history = stored.history,
                             canSwipeRight = pastStack.isNotEmpty(),
-                            isGestureTutorialVisible = showInitialTutorial
+                            appLanguage = resolvedLanguage,
+                            isGestureTutorialVisible = showInitialTutorial,
+                            lastGestureTimestamps = initialTimestamps
                         )
                     }
 
@@ -284,6 +328,9 @@ class RimaluxViewModel(
                         intricacy = effectiveIntricacy
                     )
                     renderedCache[rendered.seed] = rendered
+                    val resolvedTimestamps = StudioGestureAction.entries.associateWith { action ->
+                        pendingGestureWrites[action] ?: (stored.lastGestureTimestamps[action] ?: 0L)
+                    }
                     _uiState.update { state ->
                         state.copy(
                             preview = rendered,
@@ -294,6 +341,7 @@ class RimaluxViewModel(
                             history = stored.history,
                             isGeneratingPreview = false,
                             hasUnappliedChanges = false,
+                            lastGestureTimestamps = resolvedTimestamps,
                             config = state.config.copy(
                                 autoRotateEnabled = stored.config.autoRotateEnabled,
                                 intervalMinutes = stored.config.intervalMinutes,
@@ -303,9 +351,21 @@ class RimaluxViewModel(
                     }
                     ensureDeckPrefetchIfIdle()
                 } else {
+                    val resolvedTimestamps = StudioGestureAction.entries.associateWith { action ->
+                        pendingGestureWrites[action] ?: (stored.lastGestureTimestamps[action] ?: 0L)
+                    }
                     _uiState.update { state ->
+                        val activeAction = state.activeMiniHint?.action
+                        val keepActiveHint = if (activeAction != null) {
+                            val lastMs = resolvedTimestamps[activeAction] ?: 0L
+                            lastMs <= 0L || (clockMillis() - lastMs) > GESTURE_STALE_THRESHOLD_MS
+                        } else {
+                            false
+                        }
                         state.copy(
                             userPalettes = stored.userPalettes,
+                            lastGestureTimestamps = resolvedTimestamps,
+                            activeMiniHint = if (keepActiveHint) state.activeMiniHint else null,
                             config = state.config.copy(
                                 autoRotateEnabled = stored.config.autoRotateEnabled,
                                 intervalMinutes = stored.config.intervalMinutes,
@@ -517,12 +577,14 @@ class RimaluxViewModel(
      * (or switches to the pitch-black loading slot if the user swiped faster than background synthesis).
      */
     fun swipeLeftToNextWallpaper(): Boolean {
-        dismissGestureTutorial()
+        onPreviewUserActivity()
         val currentSnapshot = _uiState.value
         val active = currentSnapshot.preview
         if (active == null && currentSnapshot.isGeneratingPreview) {
             return false
         }
+
+        recordSuccessfulGesture(StudioGestureAction.SWIPE_LEFT)
 
         if (active != null) {
             renderedCache[active.seed] = active
@@ -582,15 +644,16 @@ class RimaluxViewModel(
 
     /**
      * Commits a swipe-right gesture: restores the immediate previous wallpaper from recent history.
-     * Returns false (and records a bounce) if there are no more recent wallpapers.
+     * Returns false (and records a bounce without crediting SWIPE_RIGHT) if there are no more recent wallpapers.
      */
     fun swipeRightToPreviousWallpaper(): Boolean {
-        dismissGestureTutorial()
         val prevItem = pastStack.removeLastOrNull()
         if (prevItem == null) {
             recordRightEdgeBounce()
             return false
         }
+
+        recordSuccessfulGesture(StudioGestureAction.SWIPE_RIGHT)
 
         val oldActive = _uiState.value.preview
         if (oldActive != null && !_uiState.value.hasUnappliedChanges) {
@@ -685,7 +748,7 @@ class RimaluxViewModel(
     }
 
     fun recordRightEdgeBounce() {
-        dismissGestureTutorial()
+        onPreviewUserActivity()
         _uiState.update { it.copy(rightEdgeBounceCount = it.rightEdgeBounceCount + 1) }
     }
 
@@ -707,10 +770,11 @@ class RimaluxViewModel(
                                 fromRunningWorker = false
                             )
                             if (result is WallpaperApplyResult.Success && !result.skippedAsDuplicate) {
+                                val locCtx = localizedContext
                                 postStatus(
-                                    appContext.getString(
+                                    locCtx.getString(
                                         R.string.msg_wallpaper_applied,
-                                        appContext.getString(current.config.autoTarget.labelRes),
+                                        locCtx.getString(current.config.autoTarget.labelRes),
                                         result.measuredBlackPercent
                                     )
                                 )
@@ -804,27 +868,142 @@ class RimaluxViewModel(
     }
 
     fun navigateTo(screen: RimaluxScreen) {
-        _uiState.update { it.copy(currentScreen = screen) }
+        _uiState.update {
+            it.copy(
+                currentScreen = screen,
+                activeMiniHint = null,
+                previewActivityEpoch = it.previewActivityEpoch + 1L
+            )
+        }
     }
 
     fun setBottomSheetOpen(isOpen: Boolean) {
-        if (isOpen) {
-            dismissGestureTutorial()
-        }
+        onPreviewUserActivity()
         _uiState.update { it.copy(isBottomSheetOpen = isOpen) }
     }
 
-    fun dismissGestureTutorial(force: Boolean = false) {
-        if (!force && _uiState.value.isGestureTutorialVisible) {
-            val elapsed = System.currentTimeMillis() - tutorialShownTimestampMs
-            if (elapsed < 800L) {
-                return
+    fun onSwipeUpOpenedSheet() {
+        recordSuccessfulGesture(StudioGestureAction.SWIPE_UP)
+        _uiState.update { it.copy(isBottomSheetOpen = true) }
+    }
+
+    fun onPreviewUserActivity() {
+        _uiState.update { state ->
+            state.copy(
+                activeMiniHint = null,
+                previewActivityEpoch = state.previewActivityEpoch + 1L
+            )
+        }
+    }
+
+    private fun recordSuccessfulGesture(action: StudioGestureAction) {
+        val now = clockMillis()
+        pendingGestureWrites[action] = now
+        _uiState.update { state ->
+            state.copy(
+                activeMiniHint = null,
+                previewActivityEpoch = state.previewActivityEpoch + 1L,
+                lastGestureTimestamps = state.lastGestureTimestamps + (action to now)
+            )
+        }
+        viewModelScope.launch {
+            try {
+                repository.recordGesturePerformed(action, now)
+            } finally {
+                if (pendingGestureWrites[action] == now) {
+                    pendingGestureWrites.remove(action)
+                }
             }
         }
+    }
+
+    fun eligibleStaleGestures(nowMillis: Long = clockMillis()): List<StudioGestureAction> {
+        val timestamps = _uiState.value.lastGestureTimestamps
+        return StudioGestureAction.entries.filter { action ->
+            val lastMs = timestamps[action] ?: 0L
+            lastMs <= 0L || (nowMillis - lastMs) > GESTURE_STALE_THRESHOLD_MS
+        }
+    }
+
+    private fun canShowMiniHintNow(state: RimaluxUiState): Boolean {
+        if (!hasInitializedFromStorage) return false
+        if (state.currentScreen != RimaluxScreen.HOME) return false
+        if (state.preview == null || state.isGeneratingPreview) return false
+        if (state.isBottomSheetOpen || state.isGestureTutorialVisible) return false
+        if (state.isSetWallpaperDialogOpen ||
+            state.isCreatePaletteSheetOpen ||
+            state.isAutoTargetDialogOpen ||
+            state.isIntervalDialogOpen ||
+            state.isCustomIntervalDialogOpen ||
+            state.isLikeAppDialogOpen ||
+            state.isSendThanksDialogOpen ||
+            state.isPatternLayoutDialogOpen ||
+            state.isColorFillDialogOpen
+        ) {
+            return false
+        }
+        return true
+    }
+
+    private fun selectNextMiniHint(currentAction: StudioGestureAction?): StudioMiniHintState? {
+        val current = _uiState.value
+        if (!canShowMiniHintNow(current)) return null
+        val eligible = eligibleStaleGestures(clockMillis())
+        if (eligible.isEmpty()) return null
+
+        val chosenAction = if (eligible.size == 1) {
+            eligible.first()
+        } else {
+            val startIdx = miniHintActionCursor.mod(eligible.size)
+            val candidate = eligible[startIdx]
+            if (currentAction != null && candidate == currentAction) {
+                val nextIdx = (startIdx + 1) % eligible.size
+                miniHintActionCursor = (nextIdx + 1) % eligible.size
+                eligible[nextIdx]
+            } else {
+                miniHintActionCursor = (startIdx + 1) % eligible.size
+                candidate
+            }
+        }
+
+        val variations = chosenAction.variationResIds
+        val nextVarIndex = (miniHintVariationCursors[chosenAction] ?: 0).mod(variations.size)
+        miniHintVariationCursors[chosenAction] = (nextVarIndex + 1) % variations.size
+
+        return StudioMiniHintState(
+            action = chosenAction,
+            variationIndex = nextVarIndex,
+            messageRes = variations[nextVarIndex]
+        )
+    }
+
+    fun showMiniHintAfterIdle(): Boolean {
+        val nextHint = selectNextMiniHint(currentAction = _uiState.value.activeMiniHint?.action)
+        _uiState.update { it.copy(activeMiniHint = nextHint) }
+        return nextHint != null
+    }
+
+    fun rotateMiniHint(): Boolean {
+        val nextHint = selectNextMiniHint(currentAction = _uiState.value.activeMiniHint?.action)
+        _uiState.update { it.copy(activeMiniHint = nextHint) }
+        return nextHint != null
+    }
+
+    fun hideMiniHint() {
+        if (_uiState.value.activeMiniHint != null) {
+            _uiState.update { it.copy(activeMiniHint = null) }
+        }
+    }
+
+    fun dismissGestureTutorial() {
         val shouldPersist = !hasDismissedTutorialThisSession || _uiState.value.isGestureTutorialVisible
         hasDismissedTutorialThisSession = true
-        if (_uiState.value.isGestureTutorialVisible) {
-            _uiState.update { it.copy(isGestureTutorialVisible = false) }
+        _uiState.update {
+            it.copy(
+                isGestureTutorialVisible = false,
+                activeMiniHint = null,
+                previewActivityEpoch = it.previewActivityEpoch + 1L
+            )
         }
         if (shouldPersist) {
             viewModelScope.launch {
@@ -834,27 +1013,22 @@ class RimaluxViewModel(
     }
 
     fun onCanvasSingleTap() {
-        val current = _uiState.value
-        if (current.isBottomSheetOpen || current.isSetWallpaperDialogOpen) return
-        if (current.isGestureTutorialVisible) {
-            dismissGestureTutorial()
-        } else {
-            hasDismissedTutorialThisSession = true
-            tutorialShownTimestampMs = System.currentTimeMillis()
-            _uiState.update { it.copy(isGestureTutorialVisible = true) }
-            viewModelScope.launch {
-                repository.setGestureTutorialSeen(true)
-            }
-        }
+        // Single-tap never opens or dismisses the Hint Window; any preview interaction closes the mini hint.
+        onPreviewUserActivity()
+    }
+
+    fun openHintWindowFromMiniHint() {
+        reopenGestureTutorial()
     }
 
     fun reopenGestureTutorial() {
         hasDismissedTutorialThisSession = true
-        tutorialShownTimestampMs = System.currentTimeMillis()
         _uiState.update {
             it.copy(
                 isBottomSheetOpen = false,
-                isGestureTutorialVisible = true
+                activeMiniHint = null,
+                isGestureTutorialVisible = true,
+                previewActivityEpoch = it.previewActivityEpoch + 1L
             )
         }
         viewModelScope.launch {
@@ -863,7 +1037,9 @@ class RimaluxViewModel(
     }
 
     fun cycleMockupOverlay() {
-        dismissGestureTutorial()
+        onPreviewUserActivity()
+        if (_uiState.value.preview == null) return
+        recordSuccessfulGesture(StudioGestureAction.SWIPE_DOWN)
         _uiState.update { state ->
             val nextMode = when (state.mockupMode) {
                 MockupOverlayMode.NONE -> MockupOverlayMode.LOCK_SCREEN
@@ -875,6 +1051,7 @@ class RimaluxViewModel(
     }
 
     fun setMockupOverlayMode(mode: MockupOverlayMode) {
+        onPreviewUserActivity()
         _uiState.update { it.copy(mockupMode = mode) }
     }
 
@@ -883,9 +1060,10 @@ class RimaluxViewModel(
     }
 
     fun openSetWallpaperDialog() {
-        dismissGestureTutorial()
+        onPreviewUserActivity()
         val current = _uiState.value
         if (current.preview == null || current.isApplyingWallpaper || current.isExportingWallpaper) return
+        recordSuccessfulGesture(StudioGestureAction.DOUBLE_TAP)
         _uiState.update { it.copy(isSetWallpaperDialogOpen = true) }
     }
 
@@ -1004,7 +1182,7 @@ class RimaluxViewModel(
             when (result) {
                 is WallpaperSaveResult.Success -> {
                     postStatus(
-                        appContext.getString(
+                        localizedContext.getString(
                             R.string.msg_wallpaper_saved,
                             result.widthPx,
                             result.heightPx
@@ -1012,7 +1190,7 @@ class RimaluxViewModel(
                     )
                 }
                 is WallpaperSaveResult.Error -> {
-                    postStatus(appContext.getString(R.string.msg_wallpaper_save_error, result.reason))
+                    postStatus(localizedContext.getString(R.string.msg_wallpaper_save_error, result.reason))
                 }
             }
         }
@@ -1031,9 +1209,10 @@ class RimaluxViewModel(
         }
 
         viewModelScope.launch {
-            val patternTitle = appContext.getString(preview.pattern.titleRes)
+            val locCtx = localizedContext
+            val patternTitle = locCtx.getString(preview.pattern.titleRes)
             val result = WallpaperExporter.prepareShareWallpaperIntent(
-                context = appContext,
+                context = locCtx,
                 scene = preview.scene,
                 patternId = preview.pattern.id,
                 patternTitle = patternTitle,
@@ -1053,7 +1232,7 @@ class RimaluxViewModel(
                 }
                 is WallpaperShareResult.Error -> {
                     _uiState.update { it.copy(isExportingWallpaper = false) }
-                    postStatus(appContext.getString(R.string.msg_wallpaper_share_error, result.reason))
+                    postStatus(locCtx.getString(R.string.msg_wallpaper_share_error, result.reason))
                 }
             }
         }
@@ -1065,11 +1244,11 @@ class RimaluxViewModel(
 
     fun reportStoragePermissionDenied() {
         _uiState.update { it.copy(isSetWallpaperDialogOpen = false) }
-        postStatus(appContext.getString(R.string.msg_storage_permission_denied))
+        postStatus(localizedContext.getString(R.string.msg_storage_permission_denied))
     }
 
     fun reportShareLaunchError(reason: String) {
-        postStatus(appContext.getString(R.string.msg_wallpaper_share_error, reason))
+        postStatus(localizedContext.getString(R.string.msg_wallpaper_share_error, reason))
     }
 
     // --- Pitch Black Controls (Rebuilds ahead queue for next swipe-left) ---
@@ -1284,9 +1463,10 @@ class RimaluxViewModel(
     }
 
     fun saveCurrentRandomColorsToList() {
+        val locCtx = localizedContext
         val colors = _uiState.value.stagedColors
         val nextIndex = _uiState.value.userPalettes.size + 1
-        val name = "Harmony #$nextIndex"
+        val name = locCtx.getString(R.string.default_harmony_palette_name, nextIndex)
         val palette = ColorPalette(
             id = "pal_${System.currentTimeMillis()}",
             name = name,
@@ -1294,7 +1474,7 @@ class RimaluxViewModel(
         )
         viewModelScope.launch {
             repository.addPaletteToList(palette, selectAndSwitchToListMode = false)
-            postStatus(appContext.getString(R.string.msg_palette_saved, name))
+            postStatus(locCtx.getString(R.string.msg_palette_saved, name))
         }
     }
 
@@ -1369,7 +1549,10 @@ class RimaluxViewModel(
     }
 
     fun addCustomPalette(name: String, colors: List<Long>) {
-        val cleanName = name.trim().ifEmpty { "Palette #${_uiState.value.userPalettes.size + 1}" }
+        val locCtx = localizedContext
+        val cleanName = name.trim().ifEmpty {
+            locCtx.getString(R.string.default_custom_palette_name, _uiState.value.userPalettes.size + 1)
+        }
         val validColors = colors.ifEmpty { listOf(0xFF00F5D4L, 0xFF7B2CBFL, 0xFFF15BB5L) }
         val palette = ColorPalette(
             id = "custom_${System.currentTimeMillis()}",
@@ -1391,7 +1574,7 @@ class RimaluxViewModel(
         invalidateAheadAndPrefetch(debounceMs = 0L)
         viewModelScope.launch {
             repository.addPaletteToList(palette, selectAndSwitchToListMode = true)
-            postStatus(appContext.getString(R.string.msg_palette_saved, cleanName))
+            postStatus(locCtx.getString(R.string.msg_palette_saved, cleanName))
         }
     }
 
@@ -1453,11 +1636,12 @@ class RimaluxViewModel(
                 repository.updateConfig {
                     it.copy(autoRotateEnabled = true, nextRunEpochMillis = nextRun)
                 }
+                val locCtx = localizedContext
                 postStatus(
-                    appContext.getString(
+                    locCtx.getString(
                         R.string.msg_schedule_updated,
-                        IntervalFormatter.formatMinutesShort(cfg.intervalMinutes),
-                        appContext.getString(cfg.autoTarget.labelRes)
+                        IntervalFormatter.formatMinutesShort(locCtx, cfg.intervalMinutes),
+                        locCtx.getString(cfg.autoTarget.labelRes)
                     )
                 )
             } else {
@@ -1500,11 +1684,12 @@ class RimaluxViewModel(
                     nextRunEpochMillis = nextRun
                 )
             }
+            val locCtx = localizedContext
             postStatus(
-                appContext.getString(
+                locCtx.getString(
                     R.string.msg_schedule_updated,
-                    IntervalFormatter.formatMinutesShort(safeMinutes),
-                    appContext.getString(autoTarget.labelRes)
+                    IntervalFormatter.formatMinutesShort(locCtx, safeMinutes),
+                    locCtx.getString(autoTarget.labelRes)
                 )
             )
         }
@@ -1538,24 +1723,52 @@ class RimaluxViewModel(
     }
 
     private fun handleApplyResult(result: WallpaperApplyResult, target: WallpaperTarget) {
+        val locCtx = localizedContext
         when (result) {
             is WallpaperApplyResult.Success -> {
                 postStatus(
-                    appContext.getString(
+                    locCtx.getString(
                         R.string.msg_wallpaper_applied,
-                        appContext.getString(target.labelRes),
+                        locCtx.getString(target.labelRes),
                         result.measuredBlackPercent
                     )
                 )
             }
             is WallpaperApplyResult.Error -> {
-                postStatus(appContext.getString(R.string.msg_wallpaper_error, result.reason))
+                postStatus(locCtx.getString(R.string.msg_wallpaper_error, result.reason))
             }
         }
     }
 
     private fun postStatus(message: String) {
         _uiState.update { it.copy(statusMessage = message) }
+    }
+
+    fun setLanguageDialogOpen(open: Boolean) {
+        _uiState.update { it.copy(isLanguageDialogOpen = open) }
+    }
+
+    fun selectAppLanguage(language: AppLanguage) {
+        val changed = AppLocaleManager.setSelectedLanguage(appContext, language)
+        _uiState.update { state ->
+            state.copy(
+                isLanguageDialogOpen = false,
+                appLanguage = language,
+                pendingLocaleRefreshToken = if (changed) {
+                    state.pendingLocaleRefreshToken + 1L
+                } else {
+                    state.pendingLocaleRefreshToken
+                }
+            )
+        }
+        viewModelScope.launch {
+            repository.setAppLanguageTag(language.languageTag)
+        }
+    }
+
+    fun consumePendingLocaleRefresh() {
+        if (_uiState.value.pendingLocaleRefreshToken == 0L) return
+        _uiState.update { it.copy(pendingLocaleRefreshToken = 0L) }
     }
 
     fun openLikeAppDialog() {
@@ -1592,12 +1805,12 @@ class RimaluxViewModel(
                 true
             }.getOrDefault(false)
         }
-        postStatus(appContext.getString(R.string.msg_rating_launched))
+        postStatus(localizedContext.getString(R.string.msg_rating_launched))
     }
 
     fun sendThanksTip(amountLabel: String) {
         closeSendThanksDialog()
-        postStatus(appContext.getString(R.string.msg_thanks_sent, amountLabel))
+        postStatus(localizedContext.getString(R.string.msg_thanks_sent, amountLabel))
     }
 
     class Factory(private val context: Context) : ViewModelProvider.Factory {

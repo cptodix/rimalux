@@ -1,5 +1,6 @@
 package com.example.model
 
+import android.content.Context
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.example.R
@@ -283,3 +284,54 @@ val ArtPattern.previewRes: Int
         ArtPattern.TRIANGULAR_GYROID -> R.drawable.pattern_preview_triangular_gyroid
         ArtPattern.GOSPER_FLOWSNAKE -> R.drawable.pattern_preview_gosper_flowsnake
     }
+
+@get:StringRes
+val ColorPalette.nameResOrNull: Int?
+    get() = when (id) {
+        "obsidian_aurora" -> R.string.palette_name_obsidian_aurora
+        "monochromatic_oled" -> R.string.palette_name_monochromatic_oled
+        "imperial_gold" -> R.string.palette_name_imperial_gold
+        "bauhaus_studio" -> R.string.palette_name_bauhaus_studio
+        "nordic_glacier" -> R.string.palette_name_nordic_glacier
+        "titanium_mono" -> R.string.palette_name_titanium_mono
+        "cyberpunk_shibuya" -> R.string.palette_name_cyberpunk_shibuya
+        "kyoto_autumn" -> R.string.palette_name_kyoto_autumn
+        "synthwave_sunset" -> R.string.palette_name_synthwave_sunset
+        "emerald_peacock" -> R.string.palette_name_emerald_peacock
+        "solar_flare" -> R.string.palette_name_solar_flare
+        "bioluminescent_reef" -> R.string.palette_name_bioluminescent_reef
+        "royal_amethyst" -> R.string.palette_name_royal_amethyst
+        "matcha_botanical" -> R.string.palette_name_matcha_botanical
+        "sahara_terracotta" -> R.string.palette_name_sahara_terracotta
+        "tokyo_neon_mint" -> R.string.palette_name_tokyo_neon_mint
+        "copper_patina" -> R.string.palette_name_copper_patina
+        "cosmic_nebula" -> R.string.palette_name_cosmic_nebula
+        "pastel_macaron" -> R.string.palette_name_pastel_macaron
+        "crimson_samurai" -> R.string.palette_name_crimson_samurai
+        "oceanic_abyss" -> R.string.palette_name_oceanic_abyss
+        "electric_citrus" -> R.string.palette_name_electric_citrus
+        "velvet_rose" -> R.string.palette_name_velvet_rose
+        "arctic_prism" -> R.string.palette_name_arctic_prism
+        "monochrome_champagne" -> R.string.palette_name_monochrome_champagne
+        "sakura_twilight" -> R.string.palette_name_sakura_twilight
+        "amber_phosphor" -> R.string.palette_name_amber_phosphor
+        "aegean_caldera" -> R.string.palette_name_aegean_caldera
+        "ultraviolet_pulse" -> R.string.palette_name_ultraviolet_pulse
+        "celadon_jade" -> R.string.palette_name_celadon_jade
+        "andes_alpenglow" -> R.string.palette_name_andes_alpenglow
+        "marrakesh_saffron" -> R.string.palette_name_marrakesh_saffron
+        "venetian_murano" -> R.string.palette_name_venetian_murano
+        "plasma_prism" -> R.string.palette_name_plasma_prism
+        "boreal_fjord" -> R.string.palette_name_boreal_fjord
+        "gilded_bronze" -> R.string.palette_name_gilded_bronze
+        "miami_mirage" -> R.string.palette_name_miami_mirage
+        "tropical_orchid" -> R.string.palette_name_tropical_orchid
+        "lunar_frost" -> R.string.palette_name_lunar_frost
+        "obsidian_ember" -> R.string.palette_name_obsidian_ember
+        "blackfire_opal" -> R.string.palette_name_blackfire_opal
+        else -> null
+    }
+
+fun ColorPalette.resolveDisplayName(context: Context): String =
+    nameResOrNull?.let(context::getString) ?: name
+

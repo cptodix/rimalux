@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.R
 import com.example.ui.components.ColorFillStyleDialog
+import com.example.ui.components.LanguageSelectorDialog
 import com.example.ui.components.LikeAppDialog
 import com.example.ui.components.PatternLayoutDialog
 import com.example.ui.components.SendThanksDialog
@@ -112,6 +113,12 @@ fun RimaluxApp(
         }
     }
 
+    LaunchedEffect(uiState.pendingLocaleRefreshToken) {
+        if (uiState.pendingLocaleRefreshToken == 0L) return@LaunchedEffect
+        viewModel.consumePendingLocaleRefresh()
+        (context as? Activity)?.recreate()
+    }
+
     val activePaletteColors = uiState.preview?.colors ?: uiState.stagedColors
 
     RimaluxTheme(paletteColors = activePaletteColors) {
@@ -155,9 +162,16 @@ fun RimaluxApp(
                                 onOpenIntervalDialog = { viewModel.setIntervalDialogOpen(true) },
                                 onOpenAutoChangeHelp = { viewModel.navigateTo(RimaluxScreen.AUTO_CHANGE_HELP) },
                                 onOpenLikeApp = viewModel::openLikeAppDialog,
+                                onOpenLanguageDialog = { viewModel.setLanguageDialogOpen(true) },
                                 onCanvasSingleTap = viewModel::onCanvasSingleTap,
                                 onDismissTutorial = viewModel::dismissGestureTutorial,
                                 onReopenGestureTutorial = viewModel::reopenGestureTutorial,
+                                onSwipeUpOpenedSheet = viewModel::onSwipeUpOpenedSheet,
+                                onPreviewUserActivity = viewModel::onPreviewUserActivity,
+                                onShowMiniHintAfterIdle = viewModel::showMiniHintAfterIdle,
+                                onRotateMiniHint = viewModel::rotateMiniHint,
+                                onHideMiniHint = viewModel::hideMiniHint,
+                                onOpenHintWindowFromMiniHint = viewModel::openHintWindowFromMiniHint,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -308,6 +322,14 @@ fun RimaluxApp(
             SendThanksDialog(
                 onSendTip = viewModel::sendThanksTip,
                 onDismiss = viewModel::closeSendThanksDialog
+            )
+        }
+
+        if (uiState.isLanguageDialogOpen) {
+            LanguageSelectorDialog(
+                selectedLanguage = uiState.appLanguage,
+                onSelectLanguage = viewModel::selectAppLanguage,
+                onDismiss = { viewModel.setLanguageDialogOpen(false) }
             )
         }
     }

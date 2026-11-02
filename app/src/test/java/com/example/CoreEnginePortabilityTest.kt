@@ -141,7 +141,7 @@ class CoreEnginePortabilityTest {
     fun pureJvm_wallpaperGeneratorEngine_synthesizesAll80PatternsWithAccurateAnalyticalBlackRatios() {
         assertEquals(4, PatternCategory.entries.size)
         assertEquals(80, ArtPattern.entries.size)
-        assertEquals(40, StarterPalettes.defaults.size)
+        assertEquals(41, StarterPalettes.defaults.size)
 
         val targetRatios = floatArrayOf(0.25f, 0.60f, 0.85f)
         val deviations = ArrayList<String>()
@@ -373,5 +373,99 @@ class CoreEnginePortabilityTest {
         val (clampedW, clampedH) = DeepBlackRatioEngine.clampDimensionsToMaxAxis(6000, 8000)
         assertEquals(3072, clampedW)
         assertEquals(4096, clampedH)
+    }
+
+    @Test
+    fun pureJvm_watermarkPlacementSolver_placesInsideSocialSafeZoneAndFindsDarkestEmptyPocket() {
+        // 1. Safe-zone crop invariants across portrait phone, foldable, and landscape tablet
+        val dims = listOf(1080 to 2400, 1080 to 1920, 1840 to 2208, 2560 to 1600)
+        for ((w, h) in dims) {
+            val safe = com.example.engine.WatermarkPlacementSolver.computeSocialSafeZone(w, h)
+            assertTrue("Safe left must clear outer edge on ${w}x$h", safe.leftPx >= (w * 0.10f).toInt())
+            assertTrue("Safe right must clear outer/UI edge on ${w}x$h", safe.rightPx <= (w * 0.89f).toInt())
+            assertTrue("Safe top must clear story header on ${w}x$h", safe.topPx >= (h * 0.16f).toInt())
+            assertTrue("Safe bottom must clear bottom chrome on ${w}x$h", safe.bottomPx <= (h * 0.82f).toInt())
+            assertTrue("Safe width must be positive", safe.widthPx > w / 3)
+            assertTrue("Safe height must be positive", safe.heightPx > h / 3)
+
+            if (h >= w) {
+                // Must also stay strictly inside centered 4:5 portrait feed crop
+                val cropH45 = kotlin.math.min(h.toFloat(), w * 1.25f)
+                val cropTop45 = ((h - cropH45) * 0.5f).toInt()
+                val cropBottom45 = ((h + cropH45) * 0.5f).toInt()
+                assertTrue("Safe top (${safe.topPx}) must survive 4:5 crop ($cropTop45)", safe.topPx > cropTop45)
+                assertTrue("Safe bottom (${safe.bottomPx}) must survive 4:5 crop ($cropBottom45)", safe.bottomPx < cropBottom45)
+            }
+        }
+
+        // 2. Dynamic empty #000000 pocket selection:
+        // Fill entire 1080x2400 image with bright neon cyan EXCEPT a #000000 pocket in the upper-right of the safe zone
+        val w = 1080
+        val h = 2400
+        val safe = com.example.engine.WatermarkPlacementSolver.computeSocialSafeZone(w, h)
+        val pocketLeft = safe.rightPx - 360
+        val pocketRight = safe.rightPx - 10
+        val pocketTop = safe.topPx + 20
+        val pocketBottom = safe.topPx + 110
+
+        val placement = com.example.engine.WatermarkPlacementSolver.findOptimalPlacement(
+            widthPx = w,
+            heightPx = h,
+            textWidthPx = 260f,
+            textHeightPx = 18f
+        ) { x, y ->
+            if (x in pocketLeft..pocketRight && y in pocketTop..pocketBottom) {
+                0xFF000000.toInt()
+            } else {
+                0xFF00F5D4.toInt()
+            }
+        }
+
+        assertTrue(placement.leftPx >= safe.leftPx - 0.01f)
+        assertTrue(placement.leftPx + placement.widthPx <= safe.rightPx + 0.01f)
+        assertTrue(placement.topPx >= safe.topPx - 0.01f)
+        assertTrue(placement.topPx + placement.heightPx <= safe.bottomPx + 0.01f)
+        assertTrue(
+            "Expected watermark X (${placement.leftPx}) inside #000000 pocket [$pocketLeft..$pocketRight]",
+            placement.leftPx >= pocketLeft - 12f && (placement.leftPx + placement.widthPx) <= pocketRight + 12f
+        )
+        assertTrue(
+            "Expected watermark Y (${placement.topPx}) inside #000000 pocket [$pocketTop..$pocketBottom]",
+            placement.topPx >= pocketTop - 10f && (placement.topPx + placement.heightPx) <= pocketBottom + 10f
+        )
+        assertTrue("Expected high true-black fraction in chosen pocket, got ${placement.trueBlackFraction}", placement.trueBlackFraction >= 0.90f)
+        assertTrue("Expected near-zero luminance in chosen pocket, got ${placement.meanLuminance}", placement.meanLuminance <= 0.05f)
+
+        // 3. 0% True Black fallback: chooses dark navy pocket over bright yellow background
+        val darkSpotPlacement = com.example.engine.WatermarkPlacementSolver.findOptimalPlacement(
+            widthPx = w,
+            heightPx = h,
+            textWidthPx = 240f,
+            textHeightPx = 18f
+        ) { x, y ->
+            if (x in (safe.leftPx + 10)..(safe.leftPx + 340) && y in (safe.topPx + 40)..(safe.topPx + 130)) {
+                0xFF0A0D18.toInt()
+            } else {
+                0xFFFFEA60.toInt()
+            }
+        }
+        assertTrue(darkSpotPlacement.leftPx <= safe.leftPx + 110f)
+        assertTrue(darkSpotPlacement.topPx <= safe.topPx + 130f)
+        assertTrue(darkSpotPlacement.meanLuminance < 0.12f)
+
+        // 4. Barely-noticeable ink alpha stays whisper-low (~14%-22%)
+        val darkInk = com.example.engine.WatermarkPlacementSolver.computeSubtleWatermarkArgb(
+            meanLuminance = 0.0f,
+            paletteColors = listOf(0xFF00F5D4L)
+        )
+        val darkInkAlpha = (darkInk ushr 24) and 0xFF
+        assertTrue("Expected whisper-low alpha on #000000, got $darkInkAlpha", darkInkAlpha in 30..48)
+
+        val brightBgInk = com.example.engine.WatermarkPlacementSolver.computeSubtleWatermarkArgb(
+            meanLuminance = 0.80f,
+            paletteColors = listOf(0xFFFFEA60L)
+        )
+        val brightBgAlpha = (brightBgInk ushr 24) and 0xFF
+        assertTrue("Expected subtle dark-ink alpha on bright pastel fill, got $brightBgAlpha", brightBgAlpha in 34..56)
     }
 }

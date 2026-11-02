@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -41,6 +42,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,8 +56,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -73,29 +78,40 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import com.example.BuildConfig
 import com.example.R
+import java.util.Calendar
+import com.example.model.AppLanguage
 import com.example.model.ArtPattern
 import com.example.model.ColorFillMode
 import com.example.model.MockupOverlayMode
 import com.example.model.PaletteMode
 import com.example.model.PatternWeightMode
 import com.example.model.PitchBlackMode
+import com.example.model.resolveDisplayName
 import com.example.model.titleRes
+import com.example.ui.RimaluxScreen
 import com.example.ui.RimaluxUiState
+import com.example.ui.RimaluxViewModel
 import com.example.ui.components.StudioGestureOverlay
+import com.example.ui.components.StudioMiniHintBar
 import com.example.ui.components.SwipeableWallpaperDeck
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private val SheetOpenEasing = CubicBezierEasing(0.22f, 1.0f, 0.36f, 1.0f)
@@ -185,11 +201,19 @@ fun StudioScreen(
     onOpenIntervalDialog: () -> Unit,
     onOpenAutoChangeHelp: () -> Unit = {},
     onOpenLikeApp: () -> Unit = {},
+    onOpenLanguageDialog: () -> Unit = {},
     onCanvasSingleTap: () -> Unit = {},
     onDismissTutorial: () -> Unit = {},
     onReopenGestureTutorial: () -> Unit = {},
+    onSwipeUpOpenedSheet: () -> Unit = {},
+    onPreviewUserActivity: () -> Unit = {},
+    onShowMiniHintAfterIdle: () -> Boolean = { false },
+    onRotateMiniHint: () -> Boolean = { false },
+    onHideMiniHint: () -> Unit = {},
+    onOpenHintWindowFromMiniHint: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val weightShortLabel = when (uiState.config.patternWeightMode) {
         PatternWeightMode.NORMAL -> stringResource(R.string.weight_short_normal)
         PatternWeightMode.CENTER_WEIGHTED -> stringResource(R.string.weight_short_center)
@@ -205,10 +229,13 @@ fun StudioScreen(
         val names = uiState.config.selectedPatterns.take(2)
             .map { stringResource(it.titleRes).substringBefore(" ") }
             .joinToString(", ")
-        val suffix = if (uiState.config.selectedPatterns.size > 2) {
-            " +${uiState.config.selectedPatterns.size - 2}"
-        } else ""
-        stringResource(R.string.summary_patterns_selected, "$names$suffix")
+        val overflowCount = uiState.config.selectedPatterns.size - 2
+        val combinedNames = if (overflowCount > 0) {
+            stringResource(R.string.summary_patterns_selected_more, names, overflowCount)
+        } else {
+            names
+        }
+        stringResource(R.string.summary_patterns_selected, combinedNames)
     }
 
     val fillFullLabel = when (uiState.config.colorFillMode) {
@@ -221,7 +248,10 @@ fun StudioScreen(
         PaletteMode.PALETTE_LIST -> {
             val activeList = uiState.userPalettes.filter { it.id in uiState.config.selectedPaletteIds }
             if (activeList.size == 1) {
-                stringResource(R.string.summary_palette_single, activeList.first().name)
+                stringResource(
+                    R.string.summary_palette_single,
+                    activeList.first().resolveDisplayName(context)
+                )
             } else {
                 stringResource(R.string.summary_palette_list, activeList.size.coerceAtLeast(1))
             }
@@ -247,8 +277,12 @@ fun StudioScreen(
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    fun animateSheetOpen() {
-        onBottomSheetOpenChange(true)
+    fun animateSheetOpen(viaSwipeUp: Boolean = false) {
+        if (viaSwipeUp) {
+            onSwipeUpOpenedSheet()
+        } else {
+            onBottomSheetOpenChange(true)
+        }
         isDraggingSheet = false
         dragTargetProgress = 1f
         dragStartedFromOpen = true
@@ -301,6 +335,7 @@ fun StudioScreen(
 
         fun applyUpwardPullPx(upwardDeltaPx: Float) {
             if (!isDraggingSheet) {
+                onPreviewUserActivity()
                 sheetAnimJob?.cancel()
                 val startProgress = sheetProgress.value
                 dragStartedFromOpen = startProgress >= 0.5f
@@ -346,7 +381,11 @@ fun StudioScreen(
                 isUpwardReopenFlick || (!isDownwardFlick && !pulledEnoughToClose)
             }
 
-            if (shouldOpen) animateSheetOpen() else animateSheetClosed()
+            if (shouldOpen) {
+                animateSheetOpen(viaSwipeUp = !dragStartedFromOpen)
+            } else {
+                animateSheetClosed()
+            }
         }
 
         val sheetNestedScroll = remember(effectiveSheetHeightPx) {
@@ -388,16 +427,62 @@ fun StudioScreen(
             }
         }
         var measuredInfoPillHeightPx by remember { mutableIntStateOf(0) }
+        var measuredMiniHintHeightPx by remember { mutableIntStateOf(0) }
         val infoBottomOffsetDp = if (uiState.hasUnappliedChanges) 98.dp else 56.dp
         val infoPillHeightDp = if (measuredInfoPillHeightPx > 0) {
             with(density) { measuredInfoPillHeightPx.toDp() }
         } else {
             34.dp
         }
+        val effectiveStatusBarTop = maxOf(statusBarTop, 10.dp)
+        val miniHintHeightDp = if (measuredMiniHintHeightPx > 0) {
+            with(density) { measuredMiniHintHeightPx.toDp() }
+        } else {
+            48.dp
+        }
+        val dynamicTopOverlayClearance = effectiveStatusBarTop + 6.dp + miniHintHeightDp + 10.dp
         val dynamicBottomOverlayClearance = navBarBottom + infoBottomOffsetDp + infoPillHeightDp + 16.dp
 
+        val isAnyModalOrHintWindowOpen = uiState.isGestureTutorialVisible ||
+            uiState.isSetWallpaperDialogOpen ||
+            uiState.isCreatePaletteSheetOpen ||
+            uiState.isAutoTargetDialogOpen ||
+            uiState.isIntervalDialogOpen ||
+            uiState.isCustomIntervalDialogOpen ||
+            uiState.isLikeAppDialogOpen ||
+            uiState.isSendThanksDialogOpen ||
+            uiState.isPatternLayoutDialogOpen ||
+            uiState.isColorFillDialogOpen ||
+            uiState.isLanguageDialogOpen
+
+        val canTrackIdleForMiniHint = uiState.currentScreen == RimaluxScreen.HOME &&
+            uiState.preview != null &&
+            !uiState.isGeneratingPreview &&
+            !uiState.isBottomSheetOpen &&
+            !isSheetComposed &&
+            !isAnyModalOrHintWindowOpen
+
+        LaunchedEffect(canTrackIdleForMiniHint, uiState.previewActivityEpoch, uiState.lastGestureTimestamps) {
+            if (!canTrackIdleForMiniHint) {
+                onHideMiniHint()
+                return@LaunchedEffect
+            }
+            if (uiState.activeMiniHint == null) {
+                delay(RimaluxViewModel.MINI_HINT_IDLE_DELAY_MS)
+                if (!onShowMiniHintAfterIdle()) {
+                    return@LaunchedEffect
+                }
+            }
+            while (isActive) {
+                delay(RimaluxViewModel.MINI_HINT_ROTATE_INTERVAL_MS)
+                if (!onRotateMiniHint()) {
+                    break
+                }
+            }
+        }
+
         Box(modifier = Modifier.fillMaxSize()) {
-            // 1. Full Edge-to-Edge Interactive Swipe Deck (Left = Next/Generate, Right = Previous/Bounce, Double-Tap = Apply Popup, Single-Tap = Toggle Hint, Swipe Down = Cycle Overlay, Swipe Up = Open Sheet)
+            // 1. Full Edge-to-Edge Interactive Swipe Deck (Left = Next/Generate, Right = Previous/Bounce, Double-Tap = Apply Popup, Swipe Down = Cycle Overlay, Swipe Up = Open Sheet)
             SwipeableWallpaperDeck(
                 currentPreview = uiState.preview,
                 previousPreview = uiState.previousPreview,
@@ -406,6 +491,7 @@ fun StudioScreen(
                 isGeneratingCurrent = uiState.isGeneratingPreview,
                 mockupMode = uiState.mockupMode,
                 bottomOverlayClearance = dynamicBottomOverlayClearance,
+                topOverlayClearance = dynamicTopOverlayClearance,
                 gesturesEnabled = !isSheetComposed,
                 onSwipeLeftCommitted = onSwipeLeftNext,
                 onSwipeRightCommitted = onSwipeRightPrevious,
@@ -413,6 +499,7 @@ fun StudioScreen(
                 onDoubleTap = onOpenSetWallpaperDialog,
                 onSingleTap = onCanvasSingleTap,
                 onSwipeDown = onSwipeDownCycleMockup,
+                onUserGestureStarted = onPreviewUserActivity,
                 onVerticalSwipeUpDelta = ::applyUpwardPullPx,
                 onVerticalSwipeUpEnd = ::settleVerticalPull
             )
@@ -523,7 +610,30 @@ fun StudioScreen(
                 }
             }
 
-            // Minimalist Gesture Tutorial & On-Demand Reminder Overlay (touch-passthrough except top-right Got It pill)
+            // Top Mini Hint (appears after 2s idle for gestures not performed in > 1 week; click opens Hint Window)
+            StudioMiniHintBar(
+                miniHint = if (!isSheetComposed && !uiState.isGestureTutorialVisible) {
+                    uiState.activeMiniHint
+                } else {
+                    null
+                },
+                paletteColors = uiState.preview?.colors ?: uiState.stagedColors,
+                onOpenHintWindow = onOpenHintWindowFromMiniHint,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(
+                        top = effectiveStatusBarTop + 6.dp,
+                        start = 20.dp,
+                        end = 20.dp
+                    )
+                    .onSizeChanged { size ->
+                        if (size.height > 0) {
+                            measuredMiniHintHeightPx = size.height
+                        }
+                    }
+            )
+
+            // Darker Translucent Hint Window (dismissed via Got It TextButton)
             StudioGestureOverlay(
                 visible = uiState.isGestureTutorialVisible && uiState.preview != null && !isSheetComposed,
                 bottomClearance = dynamicBottomOverlayClearance,
@@ -623,7 +733,10 @@ fun StudioScreen(
 
                                         if (uiState.config.pitchBlackMode == PitchBlackMode.SINGLE) {
                                             Text(
-                                                text = "${(uiState.config.pitchBlackRatio * 100f).roundToInt()}%",
+                                                text = stringResource(
+                                                    R.string.format_percent_int,
+                                                    (uiState.config.pitchBlackRatio * 100f).roundToInt()
+                                                ),
                                                 style = MaterialTheme.typography.titleSmall,
                                                 color = MaterialTheme.colorScheme.primary
                                             )
@@ -958,7 +1071,18 @@ fun StudioScreen(
                         // "Enjoying Rimalux?" Button Card at bottom part of bottom sheet
                         LikeAppButtonCard(onOpenLikeApp = onOpenLikeApp)
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        // Low-emphasis language selector & studio credit footer at the very bottom
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            StudioLanguageSelectorButton(
+                                selectedLanguage = uiState.appLanguage,
+                                onClick = onOpenLanguageDialog
+                            )
+                            StudioAboutFooter()
+                        }
                     }
                 }
             }
@@ -1046,4 +1170,63 @@ private fun LikeAppButtonCard(
             )
         }
     }
+}
+
+@Composable
+private fun StudioLanguageSelectorButton(
+    selectedLanguage: AppLanguage,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.small,
+        colors = ButtonDefaults.textButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .minimumInteractiveComponentSize()
+            .testTag("btn_open_language_selector")
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Language,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = stringResource(
+                R.string.language_selector_summary,
+                stringResource(R.string.label_language),
+                selectedLanguage.nativeName
+            ),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f)
+        )
+        Spacer(modifier = Modifier.width(2.dp))
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
+            modifier = Modifier.size(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun StudioAboutFooter() {
+    val cleanVersion = remember { BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V") }
+    val currentYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
+    Text(
+        text = stringResource(R.string.about_sheet_footer, cleanVersion, currentYear),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp, bottom = 4.dp)
+            .testTag("sheet_about_footer")
+    )
 }

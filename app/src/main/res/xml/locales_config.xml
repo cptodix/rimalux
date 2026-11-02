@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Supported per-app locales for Android 13+ system settings and Play Store language delivery.
+    When adding a new translation in `res/values-<bcp47>/strings.xml`, add its matching
+    `<locale android:name="<bcp47>" />` entry below and register it in `AppLanguage.kt`.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en-US" />
+</locale-config>

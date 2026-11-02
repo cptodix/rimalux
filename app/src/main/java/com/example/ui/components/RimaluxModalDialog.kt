@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.BasicAlertDialog
@@ -30,8 +32,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.example.R
+import com.example.model.AppLanguage
 import com.example.model.ColorFillMode
 import com.example.model.PatternWeightMode
+import java.util.Locale
 
 /**
  * Unified Material 3 modal dialog container backed by [BasicAlertDialog] so every popup across
@@ -191,6 +195,65 @@ fun ColorFillStyleDialog(
                     .heightIn(min = 48.dp)
                     .minimumInteractiveComponentSize()
                     .testTag("btn_cancel_color_fill")
+            ) {
+                Text(
+                    text = stringResource(R.string.btn_cancel),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LanguageSelectorDialog(
+    selectedLanguage: AppLanguage,
+    onSelectLanguage: (AppLanguage) -> Unit,
+    onDismiss: () -> Unit
+) {
+    RimaluxModalDialog(
+        dialogTestTag = "dialog_language_selector",
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = stringResource(R.string.dialog_language_title),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            AppLanguage.entries.forEach { language ->
+                val isSelected = selectedLanguage == language
+                val optionTag = "language_option_${language.languageTag.lowercase(Locale.ROOT)}"
+                DialogSingleChoiceRow(
+                    label = language.nativeName,
+                    isSelected = isSelected,
+                    onClick = { onSelectLanguage(language) },
+                    testTag = optionTag
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = onDismiss,
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .minimumInteractiveComponentSize()
+                    .testTag("btn_cancel_language")
             ) {
                 Text(
                     text = stringResource(R.string.btn_cancel),

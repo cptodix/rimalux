@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -64,6 +65,7 @@ fun AutoChangeSection(
     onOpenAutoChangeHelp: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val subSectionAlpha = if (config.autoRotateEnabled) 1f else 0.55f
 
     Column(
@@ -211,7 +213,7 @@ fun AutoChangeSection(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = IntervalFormatter.formatMinutesShort(config.intervalMinutes),
+                            text = IntervalFormatter.formatMinutesShort(context, config.intervalMinutes),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -382,6 +384,7 @@ fun IntervalPickerDialog(
     onOpenCustomInterval: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val isCustomActive = selectedMinutes !in IntervalFormatter.presetMinutes
     var minutesText by remember(selectedMinutes, isCustomEntryMode) {
         mutableStateOf(selectedMinutes.toString())
@@ -506,7 +509,7 @@ fun IntervalPickerDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = IntervalFormatter.formatMinutesDescriptive(mins),
+                                text = IntervalFormatter.formatMinutesDescriptive(context, mins),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = if (isSelected) {
                                     MaterialTheme.colorScheme.onSecondaryContainer
@@ -557,7 +560,7 @@ fun IntervalPickerDialog(
                             text = if (isCustomActive) {
                                 stringResource(
                                     R.string.btn_custom_interval_active,
-                                    IntervalFormatter.formatMinutesShort(selectedMinutes)
+                                    IntervalFormatter.formatMinutesShort(context, selectedMinutes)
                                 )
                             } else {
                                 stringResource(R.string.btn_custom_interval)

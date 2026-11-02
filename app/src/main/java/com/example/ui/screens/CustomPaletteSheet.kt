@@ -279,7 +279,7 @@ fun CustomPaletteSheet(
             OutlinedTextField(
                 value = hexInput,
                 onValueChange = { text ->
-                    hexInput = text.uppercase().take(7)
+                    hexInput = text.uppercase(java.util.Locale.ROOT).take(7)
                     val clean = text.removePrefix("#")
                     if (clean.length == 6) {
                         clean.toLongOrNull(16)?.let { rgb ->
@@ -320,7 +320,7 @@ fun CustomPaletteSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${hue.roundToInt()}°",
+                        text = stringResource(R.string.format_degrees_int, hue.roundToInt()),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -346,7 +346,10 @@ fun CustomPaletteSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${(saturation * 100f).roundToInt()}%",
+                        text = stringResource(
+                            R.string.format_percent_int,
+                            (saturation * 100f).roundToInt()
+                        ),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -372,7 +375,10 @@ fun CustomPaletteSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${(brightness * 100f).roundToInt()}%",
+                        text = stringResource(
+                            R.string.format_percent_int,
+                            (brightness * 100f).roundToInt()
+                        ),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary
                     )

@@ -20,6 +20,7 @@ import com.example.model.PaletteMode
 import com.example.model.PatternWeightMode
 import com.example.model.PitchBlackMode
 import com.example.model.StarterPalettes
+import com.example.model.StudioGestureAction
 import com.example.model.WallpaperTarget
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
@@ -59,7 +60,9 @@ data class StoredWallpaperState(
     val lastAutoExecMillis: Long = 0L,
     val userPalettes: List<ColorPalette> = StarterPalettes.defaults,
     val history: List<GeneratedHistoryItem> = emptyList(),
-    val hasSeenGestureTutorial: Boolean = false
+    val hasSeenGestureTutorial: Boolean = false,
+    val lastGestureTimestamps: Map<StudioGestureAction, Long> = emptyMap(),
+    val appLanguageTag: String? = null
 )
 
 class WallpaperPreferencesRepository(private val context: Context) {
@@ -91,11 +94,18 @@ class WallpaperPreferencesRepository(private val context: Context) {
         val DELETED_PALETTE_IDS = stringPreferencesKey("deleted_palette_ids")
         val HISTORY_JSON = stringPreferencesKey("history_json")
         val HAS_SEEN_GESTURE_TUTORIAL = booleanPreferencesKey("has_seen_gesture_tutorial")
+        val APP_LANGUAGE_TAG = stringPreferencesKey("app_language_tag")
+
+        fun gestureTimestampKey(action: StudioGestureAction): Preferences.Key<Long> =
+            longPreferencesKey("last_gesture_${action.id}")
     }
 
     val stateFlow: Flow<StoredWallpaperState> = context.applicationContext.rimaluxDataStore.data.map { prefs ->
         val palettes = resolveUserPalettes(prefs)
         val config = parseConfigFromPrefs(prefs, palettes)
+        val gestureTimestamps = StudioGestureAction.entries.associateWith { action ->
+            (prefs[Keys.gestureTimestampKey(action)] ?: 0L).coerceAtLeast(0L)
+        }
 
         StoredWallpaperState(
             config = config,
@@ -108,7 +118,9 @@ class WallpaperPreferencesRepository(private val context: Context) {
             lastAutoExecMillis = prefs[Keys.LAST_AUTO_EXEC_MILLIS] ?: 0L,
             userPalettes = palettes,
             history = decodeHistory(prefs[Keys.HISTORY_JSON]),
-            hasSeenGestureTutorial = prefs[Keys.HAS_SEEN_GESTURE_TUTORIAL] ?: false
+            hasSeenGestureTutorial = prefs[Keys.HAS_SEEN_GESTURE_TUTORIAL] ?: false,
+            lastGestureTimestamps = gestureTimestamps,
+            appLanguageTag = prefs[Keys.APP_LANGUAGE_TAG]
         )
     }.flowOn(Dispatchers.IO)
 
@@ -119,6 +131,36 @@ class WallpaperPreferencesRepository(private val context: Context) {
     suspend fun setGestureTutorialSeen(seen: Boolean = true) = withContext(Dispatchers.IO) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.HAS_SEEN_GESTURE_TUTORIAL] = seen
+        }
+        Unit
+    }
+
+    suspend fun setAppLanguageTag(languageTag: String) = withContext(Dispatchers.IO) {
+        context.applicationContext.rimaluxDataStore.edit { prefs ->
+            prefs[Keys.APP_LANGUAGE_TAG] = languageTag
+        }
+        Unit
+    }
+
+    suspend fun recordGesturePerformed(
+        action: StudioGestureAction,
+        timestampMillis: Long = System.currentTimeMillis()
+    ) = withContext(Dispatchers.IO) {
+        val safeMillis = timestampMillis.coerceAtLeast(0L)
+        context.applicationContext.rimaluxDataStore.edit { prefs ->
+            prefs[Keys.gestureTimestampKey(action)] = safeMillis
+        }
+        Unit
+    }
+
+    suspend fun setGestureTimestamps(
+        timestamps: Map<StudioGestureAction, Long>
+    ) = withContext(Dispatchers.IO) {
+        context.applicationContext.rimaluxDataStore.edit { prefs ->
+            StudioGestureAction.entries.forEach { action ->
+                val ts = (timestamps[action] ?: 0L).coerceAtLeast(0L)
+                prefs[Keys.gestureTimestampKey(action)] = ts
+            }
         }
         Unit
     }

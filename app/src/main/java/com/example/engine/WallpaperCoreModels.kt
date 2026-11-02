@@ -613,6 +613,7 @@ data class SynthesizedWallpaper(
 object StarterPalettes {
     val defaults: List<ColorPalette> = listOf(
         ColorPalette("obsidian_aurora", "Aurora Silk", listOf(0xFF00F5D4, 0xFF00BBF9, 0xFF7B2CBF, 0xFFF15BB5, 0xFFFFD166)),
+        ColorPalette("monochromatic_oled", "Monochromatic", listOf(0xFFFFFFFF, 0xFFE4E4E7, 0xFFA1A1AA, 0xFF71717A, 0xFF52525B)),
         ColorPalette("imperial_gold", "Imperial Gold", listOf(0xFFFFD166, 0xFFF4A261, 0xFFE76F51, 0xFF2A9D8F, 0xFFE9C46A)),
         ColorPalette("bauhaus_studio", "Bauhaus Modern", listOf(0xFFE63946, 0xFFFFB703, 0xFF219EBC, 0xFFF1FAEE)),
         ColorPalette("nordic_glacier", "Nordic Glacier", listOf(0xFFE0FBFC, 0xFF98C1D9, 0xFF3D5A80, 0xFF48CAE4)),

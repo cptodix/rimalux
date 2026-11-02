@@ -318,7 +318,7 @@ fun PatternsScreen(
                                     },
                                     modifier = Modifier
                                         .minimumInteractiveComponentSize()
-                                        .testTag("chip_pattern_cat_${category.name.lowercase()}")
+                                        .testTag("chip_pattern_cat_${category.name.lowercase(java.util.Locale.ROOT)}")
                                 )
                             }
                         }

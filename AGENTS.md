@@ -9,9 +9,10 @@ For deep-dive cross-platform porting equations and module maps, also read [`docs
 ## 1. Project Identity & Product Summary
 
 - **App Name**: `Rimalux` (must remain synced between `metadata.json` and `app/src/main/res/values/strings.xml`).
-- **Namespace / Package Root**: `com.example` (do **NOT** rename `com/example` directories or `namespace = "com.example"` in `app/build.gradle.kts`).
-- **Application ID**: `com.aistudio.rimaluxwallpaper.qrxvmn` (do **NOT** change unless explicitly instructed).
-- **Core Purpose**: Procedural mathematical vector wallpaper studio engineered specifically for OLED displays, guaranteeing an exact user-selected `#000000` True Black Ratio (`0%–95%`, default `85%`) across **80 procedural math patterns**, **Normal & Center Weighted** layout modes, **40 curated non-black palettes**, **8 HSV color-theory random harmonies**, lossless PNG export/share, and resilient background auto-change.
+- **Namespace / Package Root**: `com.cptodix.rimalux.oled.wallpaper` (`app/src/main/java/com/cptodix/rimalux/oled/wallpaper/`; keep `namespace = "com.cptodix.rimalux.oled.wallpaper"` in `app/build.gradle.kts` synced with directory structure).
+- **Application ID**: `com.cptodix.rimalux.oled.wallpaper` (do **NOT** change unless explicitly instructed).
+- **App Version**: `1.0.0` (`versionCode = 1`, surfaced at the bottom of the Studio sheet via `sheet_about_footer`).
+- **Core Purpose**: Procedural mathematical vector wallpaper studio engineered specifically for OLED displays, guaranteeing an exact user-selected `#000000` True Black Ratio (`0%–95%`, default `85%`) across **80 procedural math patterns**, **Normal & Center Weighted** layout modes, **41 curated non-black palettes** (including Monochromatic OLED), **8 HSV color-theory random harmonies**, lossless PNG export/share, multi-language localization readiness (`en-US` default), and resilient background auto-change.
 
 ---
 
@@ -21,13 +22,13 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
 
 ### Package Layer Rules
 
-1. **`com.example.engine` (`app/src/main/java/com/example/engine/`) — PURE PORTABLE CORE**
+1. **`com.cptodix.rimalux.oled.wallpaper.engine` (`app/src/main/java/com/cptodix/rimalux/oled/wallpaper/engine/`) — PURE PORTABLE CORE**
    - **Allowed imports**: `kotlin.*` standard library **ONLY** (`kotlin.math.*`, `kotlin.random.*`, `kotlin.collections.*`).
    - **STRICTLY FORBIDDEN in `engine/`**:
      - `android.*` (no `Bitmap`, `Canvas`, `Color`, `Context`, `WallpaperManager`, `MediaStore`, `DisplayMetrics`)
      - `androidx.*` (no Compose `DrawScope`, `Color`, `Brush`, `@StringRes`, `WorkManager`, `DataStore`, `ViewModel`)
-     - `com.example.R` (no resource IDs)
-     - `com.example.model.*`, `com.example.platform.*`, `com.example.data.*`, `com.example.scheduler.*`, `com.example.ui.*`
+     - `com.cptodix.rimalux.oled.wallpaper.R` (no resource IDs)
+     - `com.cptodix.rimalux.oled.wallpaper.model.*`, `com.cptodix.rimalux.oled.wallpaper.platform.*`, `com.cptodix.rimalux.oled.wallpaper.data.*`, `com.cptodix.rimalux.oled.wallpaper.scheduler.*`, `com.cptodix.rimalux.oled.wallpaper.ui.*`
    - **Automated Enforcement**: `CoreEnginePortabilityTest` scans every `.kt` file in `engine/` on the bare JVM and fails the test suite if any forbidden import or inline reference is introduced.
    - **Key Core Entry Points**:
      - `WallpaperGeneratorEngine`: High-level portable synthesis facade (`synthesize`, `synthesizeFromParameters`, `synthesizeDistinctPair`, `sampleIntricacy`, `nextDistinctSeed`).
@@ -35,25 +36,28 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
      - `CoverageCalibrator`: 2D rasterized coverage mask (`GRID_W = 200`) + center-outward priority ranking & gapless faceted underlay mosaic that calibrates each primitive's `threshold` and `areaWeight`.
      - `DeepBlackRatioEngine`: Single/range target black ratio resolution, `isPrimitiveVisible`, analytical `SceneRatioStats`, pure pixel-grid `#000000` sampler (`measureTrueBlackPercentage`), `clampDimensionsToMaxAxis`, and `computeViewportTransform`.
      - `ColorHarmonyEngine` & `RandomPaletteGenerator`: Pure HSV-to-ARGB math, non-black OLED shading floor, linear gradient endpoint math (`computeLinearGradient`), and deterministic palette selection.
+     - `WatermarkPlacementSolver`: Pure 2D summed-area-table emptiness/luminance solver and general social-media safe-zone calculator (`computeSocialSafeZone`, `findOptimalPlacement`, `computeSubtleWatermarkArgb`) for share-only watermarks.
      - `WallpaperCoreModels`: `PatternCategory`, `ArtPattern` (with portable `defaultTitle` & `defaultSubtitle`), `PatternWeightMode`, `ColorFillMode`, `PaletteMode`, `PitchBlackMode`, `ColorPalette`, `StarterPalettes`, `CoreGenerationSpec`, `SynthesizedWallpaper`.
 
-2. **`com.example.platform` (`app/src/main/java/com/example/platform/`) — ANDROID GRAPHICS & OS ADAPTERS**
+2. **`com.cptodix.rimalux.oled.wallpaper.platform` (`app/src/main/java/com/cptodix/rimalux/oled/wallpaper/platform/`) — ANDROID GRAPHICS & OS ADAPTERS**
    - `WallpaperRenderer.kt`: Rasterizes `VectorScene` onto `android.graphics.Bitmap`, measures rendered `#000000` percentage via `DeepBlackRatioEngine.measureTrueBlackPercentage`, queries `WindowManager` display metrics, and applies wallpapers via `WallpaperManager` (`HOME`, `LOCK`, `BOTH`, `BOTH_SEPARATE`).
    - `ComposeSceneRenderer.kt`: Jetpack Compose `DrawScope.drawVectorScene` adapter.
-   - `WallpaperExporter.kt`: Lossless PNG gallery export (`MediaStore` scoped storage) and `FileProvider` share chooser (`cacheDir/shared_wallpapers`, retains max 3 files).
+   - `WallpaperExporter.kt`: Unwatermarked lossless PNG gallery export (`MediaStore` scoped storage) and `FileProvider` share chooser (`cacheDir/shared_wallpapers`, retains max 3 files) with a barely-noticeable `"Procedurally generated by Rimalux · <pattern>"` watermark dynamically placed in the darkest/emptiest `#000000` pocket inside the social media safe zone.
+   - `AppLocaleManager.kt`: First-launch OS system locale negotiation (`LocaleManager.systemLocales` / `Resources.getSystem()`) with `en-US` fallback, synchronous `MainActivity.attachBaseContext` wrapping, and localized `Context` + RTL layout-direction creation.
 
-3. **`com.example.model` (`app/src/main/java/com/example/model/`) — ANDROID APP MODELS & RESOURCE MAPPINGS**
-   - `PatternResourceMappings.kt`: Maps `ArtPattern` and `PatternCategory` to Android `@StringRes` / `@DrawableRes` (`titleRes`, `subtitleRes`, `previewRes`, `labelRes`).
-   - `WallpaperModels.kt`: Re-exports core types via `typealias` and defines Android app state (`WallpaperTarget`, `MockupOverlayMode`, `GeneratorConfig` with `toCoreSpec()`, `GeneratedHistoryItem`, `IntervalFormatter`).
+3. **`com.cptodix.rimalux.oled.wallpaper.model` (`app/src/main/java/com/cptodix/rimalux/oled/wallpaper/model/`) — ANDROID APP MODELS & RESOURCE MAPPINGS**
+   - `AppLanguage.kt`: Single-source supported language registry (`EN_US` `"en-US"` currently) and pure 3-tier BCP-47 language/script/region negotiator (`resolveInitialLanguage`, `resolveBestSupportedTag`).
+   - `PatternResourceMappings.kt`: Maps `ArtPattern`, `PatternCategory`, and all 41 built-in `ColorPalette` entries to Android `@StringRes` / `@DrawableRes` (`titleRes`, `subtitleRes`, `previewRes`, `labelRes`, `nameResOrNull`, `resolveDisplayName`).
+   - `WallpaperModels.kt`: Re-exports core types via `typealias` and defines Android app state (`WallpaperTarget`, `MockupOverlayMode`, `GeneratorConfig` with `toCoreSpec()`, `GeneratedHistoryItem`, localized `IntervalFormatter`).
 
-4. **`com.example.data` (`app/src/main/java/com/example/data/`) — PERSISTENCE**
+4. **`com.cptodix.rimalux.oled.wallpaper.data` (`app/src/main/java/com/cptodix/rimalux/oled/wallpaper/data/`) — PERSISTENCE**
    - `WallpaperPreferencesRepository.kt`: Preferences DataStore (`rimalux_wallpaper_v3_prefs`).
 
-5. **`com.example.scheduler` (`app/src/main/java/com/example/scheduler/`) — BACKGROUND AUTO-CHANGE**
+5. **`com.cptodix.rimalux.oled.wallpaper.scheduler` (`app/src/main/java/com/cptodix/rimalux/oled/wallpaper/scheduler/`) — BACKGROUND AUTO-CHANGE**
    - `WallpaperScheduler.kt`, `WallpaperRotationWorker.kt`, `WallpaperAlarmReceiver.kt`, `BootCompletedReceiver.kt`, `OemBackgroundHelper.kt`.
 
-6. **`com.example.ui` (`app/src/main/java/com/example/ui/`) — PRESENTATION & COMPOSE UI**
-   - `RimaluxViewModel.kt`, `RimaluxApp.kt`, `screens/*` (`StudioScreen`, `PatternsScreen`, `PalettesScreen`, `ScheduleScreen`, `AutoChangeHelpScreen`), `components/*` (`VectorCanvasView`, `PhoneMockupOverlay`, `StudioGestureOverlay`, `RimaluxModalDialog`, `LikeAppDialogs`, `CreatePaletteSheet`), `theme/*` (`Color`, `Theme`, `Type`, `Shape`).
+6. **`com.cptodix.rimalux.oled.wallpaper.ui` (`app/src/main/java/com/cptodix/rimalux/oled/wallpaper/ui/`) — PRESENTATION & COMPOSE UI**
+   - `RimaluxViewModel.kt`, `RimaluxApp.kt`, `screens/*` (`StudioScreen`, `PatternsScreen`, `PalettesScreen`, `ScheduleScreen`, `AutoChangeHelpScreen`, `CustomPaletteSheet`), `components/*` (`VectorCanvasView`, `PhoneMockupOverlays`, `StudioGestureOverlay`, `RimaluxModalDialog`, `LikeAppDialogs`), `theme/*` (`Color`, `Theme`, `Type`).
 
 ---
 
@@ -129,7 +133,7 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
      - Subordinate quick-popup rows inside grouped cards (`Pattern Layout`, `Color Fill Style`, `Apply To`, `Interval`) use `titleSmall` and open single-choice popups rather than inline segmented buttons.
      - Dependent child rows (`Apply To`, `Interval`) **must** set `enabled = config.autoRotateEnabled` in addition to visual dimming (`0.55f` alpha) so disabled-looking rows are non-clickable while Auto-Change is off.
    - **Unified Modal Container (`RimaluxModalDialog`)**:
-     - Every popup modal (`Apply Wallpaper To`, `Pattern Layout`, `Color Fill Style`, `Apply To`, `Interval` / `Custom Interval`, `Select Brand`, `Enjoying Rimalux?`, `Send a Thanks`) **must** use `RimaluxModalDialog` (`BasicAlertDialog` in `ui/components/RimaluxModalDialog.kt`) for unified window animations, focus trapping, and TalkBack announcements. Never mix raw `Dialog`, `AlertDialog`, and custom scrim `Box`es.
+     - Every popup modal (`Apply Wallpaper To`, `Pattern Layout`, `Color Fill Style`, `Apply To`, `Interval` / `Custom Interval`, `Select Brand`, `Enjoying Rimalux?`, `Send a Thanks`, `Language`) **must** use `RimaluxModalDialog` (`BasicAlertDialog` in `ui/components/RimaluxModalDialog.kt`) for unified window animations, focus trapping, and TalkBack announcements. Never mix raw `Dialog`, `AlertDialog`, and custom scrim `Box`es.
    - **Adaptive Grids & Filter Chips**:
      - Multi-column visual galleries (`PatternsScreen`) must use `LazyVerticalGrid(GridCells.Adaptive(minSize = 160.dp))` (`.widthIn(max = 920.dp)`) with stable `key` and `contentType`—never manual `chunked(2)` rows inside a `LazyColumn`.
      - Selected `FilterChip`s must include `Icons.Rounded.Check` (`FilterChipDefaults.IconSize`) as `leadingIcon`.
@@ -140,11 +144,15 @@ All core wallpaper generation, mathematical algorithms, color harmony math, and 
 6. **UI & Gesture Performance Rules**:
    - **Defer Motion Reads to Layout/Draw Phases**: Never read continuous `Animatable` or drag-offset values directly in composition to drive animations. Gate structural composition booleans with `remember { derivedStateOf { ... } }` and apply per-frame transforms inside `Modifier.graphicsLayer { ... }` or `Modifier.offset { ... }`.
    - **Allocation Discipline**: Memoize `ColorScheme` via `remember(seedColorHex, darkTheme)`, precompute static `Brush`es outside `Canvas`, keep off-screen swipe deck neighbors hidden (`alpha = 0f`) while stationary (`abs(offsetX) < 0.5f`), and pass `key` + `contentType` to all `LazyColumn` / `LazyVerticalGrid` items.
-7. **Studio Gesture Physics & Compose `testTag` Stability**:
+7. **Studio Gesture Physics, Hint System & Compose `testTag` Stability**:
    - Horizontal swipe left advances to next wallpaper (`PREFETCH_AHEAD_TARGET = 3`); swipe right restores previous (`MAX_PAST_STACK = 24`) or triggers elastic edge bounce when empty.
-   - Double-tap opens `Apply Wallpaper To` dialog (`Home Screen`, `Lock Screen`, `Both`, `Both (Separate)`, plus `Save to Device` and `Share`); single-tap on clean preview toggles the translucent `StudioGestureOverlay` hint; swipe-down cycles `MockupOverlayMode` (`NONE` -> `LOCK_SCREEN` -> `HOME_GRID`).
-   - Vertical swipe-up reveals the hidden settings bottom sheet.
+   - Double-tap opens `Apply Wallpaper To` dialog (`Home Screen`, `Lock Screen`, `Both`, `Both Separate`, plus `Save to Device` and `Share`); swipe-down cycles `MockupOverlayMode` (`NONE` -> `LOCK_SCREEN` -> `HOME_GRID`, rendered without fake status bars and clearing both top mini hints and bottom info pills); vertical swipe-up reveals the hidden settings bottom sheet.
+   - **Hint Window & Idle Mini Hints**: `StudioGestureOverlay` (`gesture_tutorial_overlay`) uses a darker translucent card without outer backdrop darkening, never opens or dismisses on single-tap, and dismisses explicitly via its `"Got It"` `TextButton` (`btn_dismiss_tutorial`). Successful executions of each of the 5 Studio gestures (`StudioGestureAction`) persist timestamps in DataStore; after `4s` of preview idle (`MINI_HINT_IDLE_DELAY_MS = 4_000L`), `StudioMiniHintBar` (`studio_mini_hint`) appears at the top and rotates every `6s` (`MINI_HINT_ROTATE_INTERVAL_MS = 6_000L`) exclusively across gestures unused for `> 1 week` (left-aligned non-truncated playful message + CTA, right-aligned 4 palette-colored dots for all gestures: `SWIPE_LEFT` right-to-left size wave, `SWIPE_RIGHT` left-to-right size wave, `SWIPE_DOWN`/`SWIPE_UP` downward/upward vertical-offset `o -> O -> O -> o` glide, `DOUBLE_TAP` double-beat heartbeat pulse), closing immediately on any gesture/action or opening `StudioGestureOverlay` when clicked.
    - Preserve all existing `Modifier.testTag(...)` IDs and `>= 48.dp` minimum touch targets (`minimumInteractiveComponentSize()`). When testing `BasicAlertDialog` popups in Robolectric, scope ambiguous text matchers with `hasAnyAncestor(hasTestTag("dialog_..."))` because Compose tests inspect both the dialog window and underlying Studio tree.
+8. **Multi-Language Readiness & Language Selector**:
+   - All user-facing strings, `<plurals>` (`interval_desc_*`), and built-in starter palette names (`palette_name_*`) live in `res/values/strings.xml`; always pass `Locale.ROOT` to non-UI `.lowercase()` / `.uppercase()` calls on IDs, hex codes, and filenames.
+   - First launch after install resolves the user's OS system locale via `AppLocaleManager.resolveOrInitializeLanguage` -> `AppLanguage.resolveInitialLanguage` and falls back to `AppLanguage.EN_US` (`en-US`). Currently only `en-US` is enabled; to add a language later, add `res/values-<bcp47>/strings.xml`, register `<locale android:name="<bcp47>" />` in `res/xml/locales_config.xml`, and add the enum entry to `AppLanguage`.
+   - Keep the low-emphasis language selector (`btn_open_language_selector` -> `dialog_language_selector`) in the Studio bottom-sheet footer strictly between `Enjoying Rimalux?` (`btn_like_the_app`) and the version/credit line (`sheet_about_footer`).
 
 ---
 

@@ -1,6 +1,6 @@
 # Rimalux Architecture & Cross-Platform Porting Guide
 
-This document explains Rimalux's internal architecture and provides the exact mathematical and rendering specifications needed to port the core wallpaper engine (`com.example.engine`) to iOS (Swift / CoreGraphics / Metal), Web (TypeScript / Canvas2D / WebGL / SVG), Desktop, or Kotlin Multiplatform (`commonMain`).
+This document explains Rimalux's internal architecture and provides the exact mathematical and rendering specifications needed to port the core wallpaper engine (`com.cptodix.rimalux.oled.wallpaper.engine`) to iOS (Swift / CoreGraphics / Metal), Web (TypeScript / Canvas2D / WebGL / SVG), Desktop, or Kotlin Multiplatform (`commonMain`).
 
 Make sure to also read [`../AGENTS.md`](../AGENTS.md) for mandatory project rules and restrictions.
 
@@ -10,7 +10,7 @@ Make sure to also read [`../AGENTS.md`](../AGENTS.md) for mandatory project rule
 
 ```text
 ┌───────────────────────────────────────────────────────────────────────────┐
-│                  com.example.engine  (100% Pure Kotlin)                   │
+│        com.cptodix.rimalux.oled.wallpaper.engine  (100% Pure Kotlin)      │
 │  Zero Android, Compose, R.*, Context, Bitmap, DataStore, or UI imports!   │
 │                                                                           │
 │  • WallpaperCoreModels.kt     (ArtPattern[80], WeightMode, CoreSpec)      │
@@ -21,12 +21,13 @@ Make sure to also read [`../AGENTS.md`](../AGENTS.md) for mandatory project rule
 │  • CoverageCalibrator.kt      (200xH 2D coverage rasterizer & underlay)   │
 │  • DeepBlackRatioEngine.kt    (#000000 ratio math, pixel sampler, scale)  │
 │  • ColorHarmonyEngine.kt      (HSV harmony math, OLED shade floor, grad)  │
+│  • WatermarkPlacementSolver.kt(Social safe-zone & SAT empty-spot solver)  │
 └─────────────────────────────────────▲─────────────────────────────────────┘
                                       │
           ┌───────────────────────────┼───────────────────────────┐
           │                           │                           │
 ┌─────────┴──────────┐     ┌──────────┴───────────┐    ┌──────────┴───────────┐
-│ com.example.model  │     │ com.example.platform │    │     Other Targets    │
+│     .model         │     │     .platform        │    │     Other Targets    │
 │ • WallpaperModels  │     │ • WallpaperRenderer  │    │ (Future Ports: iOS,  │
 │ • PatternResource  │     │ • ComposeSceneRender │    │  Web, Desktop, KMP)  │
 │   Mappings (R.*)   │     │ • WallpaperExporter  │    └──────────────────────┘
@@ -35,7 +36,7 @@ Make sure to also read [`../AGENTS.md`](../AGENTS.md) for mandatory project rule
           ├─────────────┬─────────────┤
           │             │             │
 ┌─────────┴────────┐ ┌──┴───────────┐ ┌┴──────────────────┐
-│ com.example.data │ │ .scheduler   │ │  com.example.ui   │
+│      .data       │ │  .scheduler  │ │       .ui         │
 │ DataStore Prefs  │ │ WorkManager  │ │ RimaluxViewModel  │
 │ Repository       │ │ AlarmManager │ │ Jetpack Compose   │
 │                  │ │ OemHelper    │ │ Material 3 Screens│
@@ -55,7 +56,7 @@ Make sure to also read [`../AGENTS.md`](../AGENTS.md) for mandatory project rule
 ## 2. How the Core Mathematical Engine Works
 
 ### 2.1 Normalized Euclidean Scene Space
-Every pattern in `com.example.engine` generates geometry inside an aspect-corrected normalized 2D space:
+Every pattern in `com.cptodix.rimalux.oled.wallpaper.engine` generates geometry inside an aspect-corrected normalized 2D space:
 - **Horizontal axis (`x`)**: `[0.0f, 1.0f]`
 - **Vertical axis (`y`)**: `[0.0f, aspectRatio]` where `aspectRatio = height / width` (clamped to `[0.45f, 3.2f]`).
 
@@ -85,7 +86,7 @@ Raw procedural geometry (overlapping ribbons, concentric rings, sparse attractor
 ## 3. Step-by-Step Cross-Platform Porting Guide
 
 ### Option A: Kotlin Multiplatform (iOS, Desktop, Web/Wasm)
-1. Copy all `.kt` files in `app/src/main/java/com/example/engine/` directly into your KMP `commonMain` source set. **Zero code edits are required.**
+1. Copy all `.kt` files in `app/src/main/java/com/cptodix/rimalux/oled/wallpaper/engine/` directly into your KMP `commonMain` source set. **Zero code edits are required.**
 2. Call `WallpaperGeneratorEngine.synthesize(seed, spec, availablePalettes, aspectRatio)` from `commonMain`.
 3. Implement a thin platform rasterizer (~150 lines) per target using the exact rendering spec in **Section 3.1** below.
 
@@ -140,15 +141,20 @@ Given a `SynthesizedWallpaper` (or `VectorScene` + `paletteColors` + `pitchBlack
 4. Add Android string resources (`pattern_<id>`, `pattern_<id>_sub`) in `app/src/main/res/values/strings.xml`, static preview asset `pattern_preview_<id>` in `app/src/main/res/drawable-nodpi/`, and resource mappings in `model/PatternResourceMappings.kt`.
 5. Run `gradle :app:testDebugUnitTest` — `CoreEnginePortabilityTest`, `WallpaperEngineAndAutoScheduleTest`, and `ExampleRobolectricTest` will automatically validate all patterns!
 
+### 4.1 How to Add a New Language
+1. Add translated strings and `<plurals>` in `app/src/main/res/values-<bcp47>/strings.xml` (mirroring keys in `values/strings.xml`).
+2. Declare `<locale android:name="<bcp47>" />` inside `app/src/main/res/xml/locales_config.xml` (referenced by `android:localeConfig="@xml/locales_config"` in `AndroidManifest.xml`).
+3. Add the enum entry (`languageTag`, `nativeName` endonym) in `model/AppLanguage.kt`. First-launch system-locale detection (`AppLocaleManager.resolveOrInitializeLanguage` with `en-US` fallback), `MainActivity.attachBaseContext` wrapping, DataStore sync, and `LanguageSelectorDialog` (`dialog_language_selector`) automatically include the new language.
+
 ---
 
 ## 5. Key Compose `testTag` Registry (UI Regression Contract)
 
 | Screen / Component | `testTag` | Purpose |
 | :--- | :--- | :--- |
-| Studio Canvas & Overlays | `vector_preview_canvas`, `preview_info_overlay`, `preview_pending_notice`, `gesture_tutorial_overlay`, `btn_dismiss_tutorial` | Full-bleed swipe deck, double-tap/single-tap/swipe-down target, info pill & translucent gesture tutorial |
+| Studio Canvas & Overlays | `vector_preview_canvas`, `preview_info_overlay`, `preview_pending_notice`, `gesture_tutorial_overlay`, `btn_dismiss_tutorial`, `studio_mini_hint`, `studio_mini_hint_text`, `studio_mini_hint_icons`, `studio_mini_hint_icon_<idx>` | Full-bleed swipe deck, double-tap/single-tap/swipe-down target, info pill, translucent gesture tutorial & top idle mini hint bar with gesture animation icons |
 | Phone Mockup Overlays | `mockup_lock_screen_overlay`, `mockup_home_screen_overlay`, `mockup_app_icon_<key>`, `mockup_app_label_<key>` | Realistic Lock Screen & labeled Home Screen preview overlays |
-| Studio Bottom Sheet | `home_settings_sheet`, `home_bottom_sheet_handle`, `home_screen_scroll` | Hidden-when-closed swipe-up settings sheet & floating chevron handle |
+| Studio Bottom Sheet & Footer | `home_settings_sheet`, `home_bottom_sheet_handle`, `home_screen_scroll`, `btn_open_language_selector`, `dialog_language_selector`, `language_option_<bcp47>`, `sheet_about_footer` | Hidden-when-closed swipe-up settings sheet, floating chevron handle, low-emphasis language selector (between Enjoying Rimalux? & About text), language modal & bottom-most version/studio credit |
 | True Black Controls | `btn_black_mode_single`, `btn_black_mode_range`, `slider_pitch_black_ratio`, `range_slider_pitch_black` | True Black Ratio mode & sliders |
 | Studio Summary & Quick Rows | `pill_open_patterns`, `pill_open_pattern_layout`, `pill_open_palettes`, `pill_open_color_fill`, `btn_like_the_app` | Navigates to Patterns/Colors pages or opens quick Layout/Fill/Appreciation popups |
 | Studio Quick Popups | `dialog_pattern_layout` (`layout_option_normal`, `layout_option_center`), `dialog_color_fill` (`fill_option_solid`, `fill_option_gradient`) | Unified `BasicAlertDialog` popups for Pattern Layout & Color Fill Style |

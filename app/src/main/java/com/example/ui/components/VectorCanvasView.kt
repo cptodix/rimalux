@@ -104,6 +104,7 @@ fun SwipeableWallpaperDeck(
     isGeneratingCurrent: Boolean,
     mockupMode: MockupOverlayMode,
     bottomOverlayClearance: Dp,
+    topOverlayClearance: Dp = 0.dp,
     gesturesEnabled: Boolean,
     onSwipeLeftCommitted: () -> Boolean,
     onSwipeRightCommitted: () -> Boolean,
@@ -111,6 +112,7 @@ fun SwipeableWallpaperDeck(
     onDoubleTap: () -> Unit,
     onSingleTap: () -> Unit = {},
     onSwipeDown: () -> Unit = {},
+    onUserGestureStarted: () -> Unit = {},
     onVerticalSwipeUpDelta: (Float) -> Unit,
     onVerticalSwipeUpEnd: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -162,6 +164,7 @@ fun SwipeableWallpaperDeck(
     val latestOnDoubleTap by rememberUpdatedState(onDoubleTap)
     val latestOnSingleTap by rememberUpdatedState(onSingleTap)
     val latestOnSwipeDown by rememberUpdatedState(onSwipeDown)
+    val latestOnGestureStarted by rememberUpdatedState(onUserGestureStarted)
     val latestOnVerticalDelta by rememberUpdatedState(onVerticalSwipeUpDelta)
     val latestOnVerticalEnd by rememberUpdatedState(onVerticalSwipeUpEnd)
 
@@ -183,16 +186,6 @@ fun SwipeableWallpaperDeck(
             .onSizeChanged { size ->
                 if (size.width > 0) {
                     containerWidthPx = size.width
-                }
-            }
-            .semantics {
-                onClick(label = "Toggle gesture guide") {
-                    if (latestGesturesEnabled && !isCommittingSlide) {
-                        latestOnSingleTap()
-                        true
-                    } else {
-                        false
-                    }
                 }
             }
             .pointerInput(Unit) {
@@ -251,15 +244,18 @@ fun SwipeableWallpaperDeck(
                             if (accumulatedDy < -upwardSlopPx && absY >= absX * 0.78f) {
                                 axis = DeckGestureAxis.VERTICAL_UP
                                 change.consume()
+                                latestOnGestureStarted()
                                 latestOnVerticalDelta(-accumulatedDy)
                                 continue
                             } else if (absX > touchSlop && absX > absY) {
                                 axis = DeckGestureAxis.HORIZONTAL
                                 rawHorizontalDrag = dragOffsetX.value + accumulatedDx
                                 change.consume()
+                                latestOnGestureStarted()
                             } else if (accumulatedDy > touchSlop && absY > absX) {
                                 axis = DeckGestureAxis.VERTICAL_DOWN
                                 change.consume()
+                                latestOnGestureStarted()
                                 continue
                             } else {
                                 continue
@@ -514,7 +510,10 @@ fun SwipeableWallpaperDeck(
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize()
         ) {
-            LockScreenOverlayMockup(bottomClearance = bottomOverlayClearance)
+            LockScreenOverlayMockup(
+                bottomClearance = bottomOverlayClearance,
+                topClearance = topOverlayClearance
+            )
         }
 
         AnimatedVisibility(
@@ -523,7 +522,10 @@ fun SwipeableWallpaperDeck(
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize()
         ) {
-            HomeGridOverlayMockup(bottomClearance = bottomOverlayClearance)
+            HomeGridOverlayMockup(
+                bottomClearance = bottomOverlayClearance,
+                topClearance = topOverlayClearance
+            )
         }
     }
 }
