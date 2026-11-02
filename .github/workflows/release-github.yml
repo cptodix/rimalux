@@ -28,73 +28,47 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Validate required signing secrets
-        env:
-          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          MISSING=0
-          if [ -z "${UPLOAD_KEYSTORE_BASE64:-}" ]; then
-            echo "::error::Missing GitHub Secret: UPLOAD_KEYSTORE_BASE64"
-            MISSING=1
-          fi
-          if [ -z "${STORE_PASSWORD:-}" ]; then
-            echo "::error::Missing GitHub Secret: STORE_PASSWORD"
-            MISSING=1
-          fi
-          if [ -z "${KEY_PASSWORD:-}" ]; then
-            echo "::error::Missing GitHub Secret: KEY_PASSWORD"
-            MISSING=1
-          fi
-          if [ "$MISSING" -ne 0 ]; then
-            echo "::error::Configure all required signing secrets under Settings -> Secrets and variables -> Actions. See docs/GITHUB_ACTIONS_PUBLISHING.md."
-            exit 1
-          fi
-
-      - name: Checkout repository with tags
+      - name: Checkout repository tags
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Resolve and checkout latest version tag
+      - name: Get latest semantic version tag
+        id: latest_tag
+        uses: actions-ecosystem/action-get-latest-tag@v1
+        with:
+          semver_only: true
+          with_initial_version: false
+
+      - name: Checkout latest version tag
+        if: ${{ steps.latest_tag.outputs.tag != '' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.latest_tag.outputs.tag }}
+
+      - name: Resolve release version and filenames
         id: meta
+        env:
+          LATEST_TAG: ${{ steps.latest_tag.outputs.tag }}
         run: |
           set -euo pipefail
-          git fetch --tags --force
-
-          LATEST_TAG=$(git tag --list --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+' | head -n 1 || true)
           if [ -z "$LATEST_TAG" ]; then
-            echo "::error::No version tag (e.g., v1.0.0) was found in this repository. Create and push a tag first: git tag v1.0.0 && git push origin v1.0.0"
+            echo "::error::No semantic version tag (e.g., v1.0.0) found. Create and push a tag first: git tag v1.0.0 && git push origin v1.0.0"
             exit 1
           fi
-
-          echo "Checking out latest version tag: ${LATEST_TAG}"
-          git checkout --detach "refs/tags/${LATEST_TAG}"
 
           VERSION_NUM="${LATEST_TAG#[vV]}"
           BUILD_DATE=$(date -u +%Y%m%d)
           BASE_FILENAME="rimalux_v${VERSION_NUM}_${BUILD_DATE}"
-          APK_FILENAME="${BASE_FILENAME}.apk"
-          AAB_FILENAME="${BASE_FILENAME}.aab"
-
-          GRADLE_VERSION_NAME=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1 || true)
-          GRADLE_VERSION_CODE=$(sed -n 's/.*versionCode *= *\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1 || true)
-
-          if [ -n "$GRADLE_VERSION_NAME" ] && [ "$GRADLE_VERSION_NAME" != "$VERSION_NUM" ]; then
-            echo "::warning::Tag version (${VERSION_NUM}) differs from app/build.gradle.kts versionName (${GRADLE_VERSION_NAME})."
-          fi
 
           {
             echo "tag=${LATEST_TAG}"
             echo "version=${VERSION_NUM}"
-            echo "version_code=${GRADLE_VERSION_CODE}"
             echo "build_date=${BUILD_DATE}"
             echo "base_filename=${BASE_FILENAME}"
-            echo "apk_filename=${APK_FILENAME}"
-            echo "aab_filename=${AAB_FILENAME}"
+            echo "apk_filename=${BASE_FILENAME}.apk"
+            echo "aab_filename=${BASE_FILENAME}.aab"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 21
@@ -106,113 +80,32 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses > /dev/null || true
-
-      - name: Set up Gradle 9.3.1
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      - name: Prepare environment and signing keystore
+      - name: Decode upload keystore
+        id: upload_keystore
+        uses: timheuer/base64-to-file@v2
+        with:
+          fileName: 'my-upload-key.jks'
+          encodedString: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+
+      - name: Build and rename signed APK and AAB
         env:
-          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-        run: |
-          set -euo pipefail
-
-          if [ ! -f ".env" ]; then
-            if [ -f ".env.example" ]; then
-              cp .env.example .env
-            else
-              touch .env
-            fi
-          fi
-
-          if [ ! -f "debug.keystore" ] && [ -f "debug.keystore.base64" ]; then
-            tr -d '[:space:]' < debug.keystore.base64 | base64 --decode > debug.keystore
-          fi
-
-          KEYSTORE_FILE="${RUNNER_TEMP}/rimalux-upload-key.jks"
-          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$KEYSTORE_FILE"
-          chmod 600 "$KEYSTORE_FILE"
-
-          if [ ! -s "$KEYSTORE_FILE" ]; then
-            echo "::error::Decoded upload keystore is empty. Check UPLOAD_KEYSTORE_BASE64."
-            exit 1
-          fi
-
-          if ! keytool -list -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASSWORD" -alias upload > /dev/null 2>&1; then
-            echo "::error::Keystore check failed: ensure STORE_PASSWORD is valid and the keystore contains key alias 'upload' (required by app/build.gradle.kts)."
-            exit 1
-          fi
-
-          echo "KEYSTORE_PATH=${KEYSTORE_FILE}" >> "$GITHUB_ENV"
-
-      - name: Build signed Release APK and AAB
-        env:
+          KEYSTORE_PATH: ${{ steps.upload_keystore.outputs.filePath }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          if [ -x "./gradlew" ]; then
-            GRADLE_CMD="./gradlew"
-          else
-            GRADLE_CMD="gradle"
-          fi
-
-          "$GRADLE_CMD" :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
-
-      - name: Package and verify release artifacts
-        id: package
-        env:
-          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
-          VERSION_NUM: ${{ steps.meta.outputs.version }}
-          VERSION_CODE: ${{ steps.meta.outputs.version_code }}
           APK_FILENAME: ${{ steps.meta.outputs.apk_filename }}
           AAB_FILENAME: ${{ steps.meta.outputs.aab_filename }}
         run: |
           set -euo pipefail
+          gradle :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
+
           mkdir -p dist
-
-          APK_SRC=$(find app/build/outputs/apk/release -maxdepth 2 -type f -name "*.apk" ! -name "*-unsigned.apk" | head -n 1 || true)
-          AAB_SRC=$(find app/build/outputs/bundle/release -maxdepth 2 -type f -name "*.aab" | head -n 1 || true)
-
-          if [ -z "$APK_SRC" ] || [ ! -f "$APK_SRC" ]; then
-            echo "::error::Signed release APK was not produced under app/build/outputs/apk/release."
-            exit 1
-          fi
-
-          if [ -z "$AAB_SRC" ] || [ ! -f "$AAB_SRC" ]; then
-            echo "::error::Signed release AAB was not produced under app/build/outputs/bundle/release."
-            exit 1
-          fi
-
-          DEST_APK="dist/${APK_FILENAME}"
-          DEST_AAB="dist/${AAB_FILENAME}"
-
-          cp "$APK_SRC" "$DEST_APK"
-          cp "$AAB_SRC" "$DEST_AAB"
-
-          jarsigner -verify "$DEST_AAB" > /dev/null
-
-          APK_SHA256=$(sha256sum "$DEST_APK" | awk '{print $1}')
-          AAB_SHA256=$(sha256sum "$DEST_AAB" | awk '{print $1}')
-
-          {
-            echo "apk_sha256=${APK_SHA256}"
-            echo "aab_sha256=${AAB_SHA256}"
-          } >> "$GITHUB_OUTPUT"
-
-          {
-            echo "### GitHub Release Published"
-            echo "- **Tag:** \`${RELEASE_TAG}\`"
-            echo "- **Version:** \`v${VERSION_NUM}\` (\`versionCode ${VERSION_CODE}\`)"
-            echo "- **Phone Sideload APK:** \`${APK_FILENAME}\`"
-            echo "  - SHA-256: \`${APK_SHA256}\`"
-            echo "- **Google Play Bundle (AAB):** \`${AAB_FILENAME}\`"
-            echo "  - SHA-256: \`${AAB_SHA256}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          cp app/build/outputs/apk/release/app-release.apk "dist/${APK_FILENAME}"
+          cp app/build/outputs/bundle/release/app-release.aab "dist/${AAB_FILENAME}"
 
       - name: Upload APK and AAB to workflow artifacts
         uses: actions/upload-artifact@v4
@@ -233,15 +126,9 @@ jobs:
           prerelease: ${{ inputs.prerelease }}
           generate_release_notes: true
           body: |
-            ### Release Assets (`${{ steps.meta.outputs.build_date }}`)
+            ### Release Packages (`${{ steps.meta.outputs.build_date }}`)
             - **Phone Sideload APK:** `${{ steps.meta.outputs.apk_filename }}`
-              - SHA-256: `${{ steps.package.outputs.apk_sha256 }}`
             - **Google Play Console App Bundle (AAB):** `${{ steps.meta.outputs.aab_filename }}`
-              - SHA-256: `${{ steps.package.outputs.aab_sha256 }}`
           files: |
             dist/${{ steps.meta.outputs.apk_filename }}
             dist/${{ steps.meta.outputs.aab_filename }}
-
-      - name: Clean up temporary keystore
-        if: always()
-        run: rm -f "${RUNNER_TEMP}/rimalux-upload-key.jks"

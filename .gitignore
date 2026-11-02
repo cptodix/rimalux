@@ -19,5 +19,6 @@ debug.keystore
 *.jks
 *.keystore
 *service-account*.json
+gha-creds-*.json
 /dist
 
