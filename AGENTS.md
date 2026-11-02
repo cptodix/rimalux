@@ -2,7 +2,7 @@
 
 Read this file completely before modifying, extending, or porting Rimalux. It defines the architectural boundaries, mathematical contracts, concurrency rules, UI/UX policies, and build/test restrictions that keep the codebase portable and regression-free.
 
-For deep-dive cross-platform porting equations and module maps, also read [`docs/ARCHITECTURE_AND_PORTING.md`](docs/ARCHITECTURE_AND_PORTING.md).
+For deep-dive cross-platform porting equations and module maps, also read [`docs/ARCHITECTURE_AND_PORTING.md`](docs/ARCHITECTURE_AND_PORTING.md). For manual GitHub Actions release builds (`.apk`/`.aab`) and direct Google Play Console publishing setup, see [`docs/GITHUB_ACTIONS_PUBLISHING.md`](docs/GITHUB_ACTIONS_PUBLISHING.md).
 
 ---
 

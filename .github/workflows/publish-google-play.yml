@@ -1,0 +1,365 @@
+name: Build & Publish to Google Play Console
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Google Play Console release track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      release_status:
+        description: 'Play release status (use draft if app has not passed initial Google Play review)'
+        required: true
+        default: 'completed'
+        type: choice
+        options:
+          - completed
+          - draft
+          - inProgress
+          - halted
+      user_fraction:
+        description: 'Staged rollout fraction (0.01 to 0.99 — required only when release_status is inProgress)'
+        required: false
+        default: ''
+        type: string
+      in_app_update_priority:
+        description: 'In-app update priority (0 = lowest, 5 = highest)'
+        required: false
+        default: '0'
+        type: choice
+        options:
+          - '0'
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+          - '5'
+      git_ref:
+        description: 'Optional tag (e.g. v1.0.1) or branch; leave empty to build from latest version tag'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rimalux-google-play-publish
+  cancel-in-progress: false
+
+jobs:
+  google-play-publish:
+    name: Build & Upload AAB to Google Play (${{ inputs.track }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Validate secrets and rollout parameters
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          INPUT_STATUS: ${{ inputs.release_status }}
+          INPUT_FRACTION: ${{ inputs.user_fraction }}
+        run: |
+          set -euo pipefail
+          MISSING=0
+          if [ -z "${UPLOAD_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::Missing GitHub Secret: UPLOAD_KEYSTORE_BASE64"
+            MISSING=1
+          fi
+          if [ -z "${STORE_PASSWORD:-}" ]; then
+            echo "::error::Missing GitHub Secret: STORE_PASSWORD"
+            MISSING=1
+          fi
+          if [ -z "${KEY_PASSWORD:-}" ]; then
+            echo "::error::Missing GitHub Secret: KEY_PASSWORD"
+            MISSING=1
+          fi
+          if [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo "::error::Missing GitHub Secret: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
+            MISSING=1
+          fi
+          if [ "$MISSING" -ne 0 ]; then
+            echo "::error::Configure all required secrets under Settings -> Secrets and variables -> Actions. See docs/GITHUB_ACTIONS_PUBLISHING.md."
+            exit 1
+          fi
+
+          if [ "$INPUT_STATUS" = "inProgress" ]; then
+            if [ -z "$INPUT_FRACTION" ]; then
+              echo "::error::Input 'user_fraction' (e.g. 0.1 for 10%) is required when 'release_status' is 'inProgress'."
+              exit 1
+            fi
+            python3 - "$INPUT_FRACTION" <<'PY'
+          import sys
+          try:
+              val = float(sys.argv[1])
+          except ValueError:
+              print("::error::user_fraction must be a decimal between 0.01 and 0.99.")
+              sys.exit(1)
+          if not (0.0 < val < 1.0):
+              print("::error::user_fraction must be strictly between 0.0 and 1.0 (e.g. 0.1 for 10%).")
+              sys.exit(1)
+          PY
+          fi
+
+      - name: Checkout repository with tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve target ref and version metadata
+        id: meta
+        env:
+          INPUT_GIT_REF: ${{ inputs.git_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+
+          if [ -n "$INPUT_GIT_REF" ]; then
+            TARGET_REF="$INPUT_GIT_REF"
+            if git rev-parse -q --verify "refs/tags/${TARGET_REF}" > /dev/null; then
+              git checkout --detach "refs/tags/${TARGET_REF}"
+            else
+              git checkout "$TARGET_REF"
+            fi
+          else
+            TARGET_REF=$(git tag --list --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+' | head -n 1 || true)
+            if [ -z "$TARGET_REF" ]; then
+              echo "::error::No version tag (e.g., v1.0.1) found. Push a version tag first or specify 'git_ref' manually."
+              exit 1
+            fi
+            git checkout --detach "refs/tags/${TARGET_REF}"
+          fi
+
+          GRADLE_VERSION_NAME=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1 || true)
+          GRADLE_VERSION_CODE=$(sed -n 's/.*versionCode *= *\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1 || true)
+
+          if [ -z "$GRADLE_VERSION_NAME" ] || [ -z "$GRADLE_VERSION_CODE" ]; then
+            echo "::error::Unable to parse versionName or versionCode from app/build.gradle.kts."
+            exit 1
+          fi
+
+          if printf '%s' "$TARGET_REF" | grep -Eq '^v?[0-9]+\.[0-9]+'; then
+            VERSION_NUM="${TARGET_REF#[vV]}"
+            if [ "$GRADLE_VERSION_NAME" != "$VERSION_NUM" ]; then
+              echo "::warning::Tag version (${VERSION_NUM}) differs from app/build.gradle.kts versionName (${GRADLE_VERSION_NAME})."
+            fi
+          else
+            VERSION_NUM="$GRADLE_VERSION_NAME"
+          fi
+
+          BUILD_DATE=$(date -u +%Y%m%d)
+          BASE_FILENAME="rimalux_v${VERSION_NUM}_${BUILD_DATE}"
+          AAB_FILENAME="${BASE_FILENAME}.aab"
+
+          WHATSNEW_DIR=""
+          if [ -d "distribution/whatsnew" ] && compgen -G "distribution/whatsnew/whatsnew-*" > /dev/null; then
+            for f in distribution/whatsnew/whatsnew-*; do
+              CHAR_COUNT=$(wc -m < "$f" | tr -d '[:space:]')
+              if [ "$CHAR_COUNT" -gt 500 ]; then
+                echo "::error::Release notes file '$f' is ${CHAR_COUNT} characters (Google Play maximum is 500 characters)."
+                exit 1
+              fi
+            done
+            WHATSNEW_DIR="distribution/whatsnew"
+          fi
+
+          {
+            echo "resolved_ref=${TARGET_REF}"
+            echo "version=${VERSION_NUM}"
+            echo "version_code=${GRADLE_VERSION_CODE}"
+            echo "build_date=${BUILD_DATE}"
+            echo "base_filename=${BASE_FILENAME}"
+            echo "aab_filename=${AAB_FILENAME}"
+            echo "whatsnew_dir=${WHATSNEW_DIR}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Prepare signing keystore and Google Play credentials
+        id: credentials
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f ".env" ]; then
+            if [ -f ".env.example" ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
+          fi
+
+          if [ ! -f "debug.keystore" ] && [ -f "debug.keystore.base64" ]; then
+            tr -d '[:space:]' < debug.keystore.base64 | base64 --decode > debug.keystore
+          fi
+
+          KEYSTORE_FILE="${RUNNER_TEMP}/rimalux-upload-key.jks"
+          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+
+          if ! keytool -list -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASSWORD" -alias upload > /dev/null 2>&1; then
+            echo "::error::Keystore check failed: ensure STORE_PASSWORD is valid and the keystore contains key alias 'upload' (required by app/build.gradle.kts)."
+            exit 1
+          fi
+
+          echo "KEYSTORE_PATH=${KEYSTORE_FILE}" >> "$GITHUB_ENV"
+
+          SA_FILE="${RUNNER_TEMP}/play-service-account.json"
+          python3 - "$SA_FILE" <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+
+          raw = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "").strip()
+          out_path = sys.argv[1]
+
+          if raw.startswith("{"):
+              decoded_text = raw
+          else:
+              try:
+                  decoded_text = base64.b64decode("".join(raw.split())).decode("utf-8")
+              except Exception:
+                  print("::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is neither valid raw JSON nor valid Base64-encoded JSON.")
+                  sys.exit(1)
+
+          try:
+              data = json.loads(decoded_text)
+          except Exception:
+              print("::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON could not be parsed as JSON.")
+              sys.exit(1)
+
+          required_keys = {"type", "client_email", "private_key"}
+          missing = required_keys - set(data.keys())
+          if missing or data.get("type") != "service_account":
+              print("::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON must be a Google Cloud Service Account JSON key containing type='service_account', client_email, and private_key.")
+              sys.exit(1)
+
+          with open(out_path, "w", encoding="utf-8") as fh:
+              json.dump(data, fh)
+          os.chmod(out_path, 0o600)
+          PY
+
+          echo "service_account_path=${SA_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed Release AAB
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -x "./gradlew" ]; then
+            GRADLE_CMD="./gradlew"
+          else
+            GRADLE_CMD="gradle"
+          fi
+
+          "$GRADLE_CMD" :app:bundleRelease --no-daemon --stacktrace
+
+      - name: Package and verify Release AAB
+        id: package
+        env:
+          AAB_FILENAME: ${{ steps.meta.outputs.aab_filename }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          AAB_SRC=$(find app/build/outputs/bundle/release -maxdepth 2 -type f -name "*.aab" | head -n 1 || true)
+          if [ -z "$AAB_SRC" ] || [ ! -f "$AAB_SRC" ]; then
+            echo "::error::Signed release AAB was not produced under app/build/outputs/bundle/release."
+            exit 1
+          fi
+
+          DEST_AAB="dist/${AAB_FILENAME}"
+          cp "$AAB_SRC" "$DEST_AAB"
+
+          jarsigner -verify "$DEST_AAB" > /dev/null
+
+          AAB_SHA256=$(sha256sum "$DEST_AAB" | awk '{print $1}')
+
+          MAPPING_FILE=""
+          if [ -f "app/build/outputs/mapping/release/mapping.txt" ]; then
+            MAPPING_FILE="app/build/outputs/mapping/release/mapping.txt"
+          fi
+
+          {
+            echo "aab_sha256=${AAB_SHA256}"
+            echo "mapping_file=${MAPPING_FILE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Archive Release AAB to workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.base_filename }}
+          path: dist/${{ steps.meta.outputs.aab_filename }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload AAB to Google Play Console
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: ${{ steps.credentials.outputs.service_account_path }}
+          packageName: com.cptodix.rimalux.oled.wallpaper
+          releaseFiles: dist/${{ steps.meta.outputs.aab_filename }}
+          releaseName: v${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.version_code }})
+          track: ${{ inputs.track }}
+          status: ${{ inputs.release_status }}
+          userFraction: ${{ inputs.release_status == 'inProgress' && inputs.user_fraction || '' }}
+          inAppUpdatePriority: ${{ inputs.in_app_update_priority }}
+          whatsNewDirectory: ${{ steps.meta.outputs.whatsnew_dir }}
+          mappingFile: ${{ steps.package.outputs.mapping_file }}
+
+      - name: Write Play Console deployment summary
+        env:
+          RESOLVED_REF: ${{ steps.meta.outputs.resolved_ref }}
+          VERSION_NUM: ${{ steps.meta.outputs.version }}
+          VERSION_CODE: ${{ steps.meta.outputs.version_code }}
+          AAB_FILENAME: ${{ steps.meta.outputs.aab_filename }}
+          AAB_SHA256: ${{ steps.package.outputs.aab_sha256 }}
+          PLAY_TRACK: ${{ inputs.track }}
+          PLAY_STATUS: ${{ inputs.release_status }}
+        run: |
+          {
+            echo "### Google Play Console Upload Complete"
+            echo "- **Package Name:** \`com.cptodix.rimalux.oled.wallpaper\`"
+            echo "- **Git Ref:** \`${RESOLVED_REF}\`"
+            echo "- **Version:** \`v${VERSION_NUM}\` (\`versionCode ${VERSION_CODE}\`)"
+            echo "- **Bundle Uploaded:** \`${AAB_FILENAME}\`"
+            echo "- **SHA-256:** \`${AAB_SHA256}\`"
+            echo "- **Track:** \`${PLAY_TRACK}\`"
+            echo "- **Status:** \`${PLAY_STATUS}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up temporary credentials
+        if: always()
+        run: |
+          rm -f "${RUNNER_TEMP}/rimalux-upload-key.jks"
+          rm -f "${RUNNER_TEMP}/play-service-account.json"
