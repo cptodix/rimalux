@@ -63,7 +63,20 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  val prebakedM2Uri = file("/home/appuser/.m2/repository")
+    .takeIf { it.isDirectory }
+    ?.toURI()
+    ?.toString()
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all { testTask ->
+        if (prebakedM2Uri != null) {
+          testTask.systemProperty("robolectric.dependency.repo.url", prebakedM2Uri)
+        }
+      }
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
@@ -103,6 +116,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.work.runtime.ktx)
+  implementation(libs.play.billing.ktx)
   // implementation(libs.androidx.navigation.compose)
   // implementation(libs.androidx.room.ktx)
   // implementation(libs.androidx.room.runtime)

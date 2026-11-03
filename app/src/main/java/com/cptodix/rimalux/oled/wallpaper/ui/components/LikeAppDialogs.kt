@@ -35,6 +35,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cptodix.rimalux.oled.wallpaper.R
+import com.cptodix.rimalux.oled.wallpaper.model.TipCatalogItem
+import com.cptodix.rimalux.oled.wallpaper.model.TipProduct
 
 @Composable
 fun LikeAppDialog(
@@ -160,23 +162,11 @@ fun LikeAppDialog(
     }
 }
 
-private data class TipJarOption(
-    val amountKey: String,
-    val labelRes: Int
-)
-
-private val TipJarOptions = listOf(
-    TipJarOption(amountKey = "1", labelRes = R.string.tip_1_usd),
-    TipJarOption(amountKey = "3", labelRes = R.string.tip_3_usd),
-    TipJarOption(amountKey = "5", labelRes = R.string.tip_5_usd),
-    TipJarOption(amountKey = "10", labelRes = R.string.tip_10_usd),
-    TipJarOption(amountKey = "20", labelRes = R.string.tip_20_usd)
-)
-
 @Composable
 fun SendThanksDialog(
-    onSendTip: (String) -> Unit,
+    onSelectTip: (TipProduct) -> Unit,
     onDismiss: () -> Unit,
+    tipCatalog: List<TipCatalogItem> = TipCatalogItem.defaultCatalog,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -228,17 +218,18 @@ fun SendThanksDialog(
                     textAlign = TextAlign.Center
                 )
 
-                // Single-column direct-action tip buttons ($1, $3, $5, $10, $20)
+                // Single-column direct-action tip buttons backed by Google Play Billing INAPP products
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("tip_options_column"),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TipJarOptions.forEach { option ->
-                        val tipLabel = stringResource(option.labelRes)
+                    tipCatalog.forEach { item ->
+                        val tipLabel = item.formattedPrice?.takeIf { it.isNotBlank() }
+                            ?: stringResource(item.product.fallbackLabelRes)
                         Surface(
-                            onClick = { onSendTip(tipLabel) },
+                            onClick = { onSelectTip(item.product) },
                             shape = shapes.medium,
                             color = colorScheme.surfaceContainerHighest,
                             border = BorderStroke(
@@ -249,7 +240,7 @@ fun SendThanksDialog(
                                 .fillMaxWidth()
                                 .heightIn(min = 48.dp)
                                 .minimumInteractiveComponentSize()
-                                .testTag("btn_tip_${option.amountKey}")
+                                .testTag("btn_tip_${item.product.amountKey}")
                         ) {
                             Row(
                                 modifier = Modifier

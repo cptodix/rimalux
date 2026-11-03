@@ -445,6 +445,10 @@
     <string name="tip_20_usd">$20</string>
     <string name="msg_rating_launched">Opening Play Store for rating…</string>
     <string name="msg_thanks_sent">Thank you so much for the %1$s! Your tip means the world.</string>
+    <string name="msg_tip_pending">Your %1$s tip is pending payment confirmation in Google Play.</string>
+    <string name="msg_tip_unavailable">This tip option is not active in Google Play yet.</string>
+    <string name="msg_tip_billing_unavailable">Google Play billing is unavailable on this device.</string>
+    <string name="msg_tip_error">Could not complete tip purchase: %1$s</string>
     <string name="about_sheet_footer">Rimalux v%1$s by Cptodix Studio @%2$d</string>
 
     <!-- Language selector & localization formatters -->

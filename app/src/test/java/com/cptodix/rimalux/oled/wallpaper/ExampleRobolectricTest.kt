@@ -770,8 +770,8 @@ class ExampleRobolectricTest {
                 }
             }
             assertTrue(
-                "Expected shared PNG to render watermark glyphs (>0 modified pixels), got $watermarkPixelCount",
-                watermarkPixelCount > 25
+                "Expected shared PNG to render crisp watermark glyphs (>80 modified pixels), got $watermarkPixelCount",
+                watermarkPixelCount > 80
             )
             assertEquals(
                 "Watermark pixels must never spill outside social media safe zone ($safeZone)",
@@ -779,9 +779,37 @@ class ExampleRobolectricTest {
                 outsideSafeZoneDiffCount
             )
             assertTrue(
-                "Watermark on #000000 must stay barely noticeable (peak RGB <= 60), got $maxDeltaOnPureBlack",
-                maxDeltaOnPureBlack <= 60
+                "Watermark on #000000 must stay clearly visible above OLED black crush yet subtle (peak RGB in 75..155), got $maxDeltaOnPureBlack",
+                maxDeltaOnPureBlack in 75..155
             )
+
+            // Verify watermark also survives 3x system Share Sheet / messaging thumbnail downscaling
+            val downW = (expectedSpec.widthPx / 3).coerceAtLeast(1)
+            val downH = (expectedSpec.heightPx / 3).coerceAtLeast(1)
+            val cleanThumb = android.graphics.Bitmap.createScaledBitmap(cleanBitmap, downW, downH, true)
+            val sharedThumb = android.graphics.Bitmap.createScaledBitmap(sharedBitmap, downW, downH, true)
+            try {
+                var maxThumbDelta = 0
+                for (ty in 0 until downH) {
+                    for (tx in 0 until downW) {
+                        val cp = cleanThumb.getPixel(tx, ty) and 0x00FFFFFF
+                        val sp = sharedThumb.getPixel(tx, ty) and 0x00FFFFFF
+                        if (cp != sp) {
+                            val dr = kotlin.math.abs(((sp ushr 16) and 0xFF) - ((cp ushr 16) and 0xFF))
+                            val dg = kotlin.math.abs(((sp ushr 8) and 0xFF) - ((cp ushr 8) and 0xFF))
+                            val db = kotlin.math.abs((sp and 0xFF) - (cp and 0xFF))
+                            maxThumbDelta = maxOf(maxThumbDelta, dr, dg, db)
+                        }
+                    }
+                }
+                assertTrue(
+                    "Watermark must remain visibly legible after 3x Share Sheet downscaling (peak delta >= 28), got $maxThumbDelta",
+                    maxThumbDelta >= 28
+                )
+            } finally {
+                cleanThumb.recycle()
+                sharedThumb.recycle()
+            }
         } finally {
             cleanBitmap.recycle()
             sharedBitmap.recycle()
@@ -1027,13 +1055,13 @@ class ExampleRobolectricTest {
             )
         }
 
-        // Direct action tap on $3 immediately sends thanks and closes dialog
+        // Direct action tap on $3 closes dialog and reports Play Billing unavailable on bare JVM (no fake mock purchase)
         composeTestRule.onNodeWithTag("btn_tip_3").performClick()
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("dialog_send_thanks").assertDoesNotExist()
         val status = viewModel.uiState.value.statusMessage.orEmpty()
-        assertEquals("Thank you so much for the $3! Your tip means the world.", status)
+        assertEquals("Google Play billing is unavailable on this device.", status)
 
         // Reopen "Enjoying Rimalux?" -> tap "Rate the App"
         composeTestRule.onNodeWithTag("btn_like_the_app").performClick()
@@ -1468,19 +1496,43 @@ class ExampleRobolectricTest {
         val width = 1080
         val height = 2400
         val safe = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.computeSocialSafeZone(width, height)
-        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-        try {
-            // Paint bright artwork everywhere except a pure #000000 dark pocket in the upper-right of the safe zone
-            val canvas = android.graphics.Canvas(bitmap)
-            canvas.drawColor(0xFF3A86FF.toInt())
-            val darkPaint = android.graphics.Paint().apply {
-                color = 0xFF000000.toInt()
-                style = android.graphics.Paint.Style.FILL
+        val darkPaint = android.graphics.Paint().apply {
+            color = 0xFF000000.toInt()
+            style = android.graphics.Paint.Style.FILL
+        }
+
+        fun countNonBlackPixels(bmp: android.graphics.Bitmap, x0: Int, y0: Int, x1: Int, y1: Int): Int {
+            var count = 0
+            val cx0 = x0.coerceIn(0, bmp.width - 1)
+            val cx1 = x1.coerceIn(cx0, bmp.width - 1)
+            val cy0 = y0.coerceIn(0, bmp.height - 1)
+            val cy1 = y1.coerceIn(cy0, bmp.height - 1)
+            val row = IntArray(cx1 - cx0 + 1)
+            for (y in cy0..cy1) {
+                bmp.getPixels(row, 0, row.size, cx0, y, row.size, 1)
+                for (px in row) {
+                    if ((px and 0x00FFFFFF) != 0) count++
+                }
             }
-            val pocketLeft = safe.rightPx - 460
-            val pocketRight = safe.rightPx - 8
-            val pocketTop = safe.topPx + 18
-            val pocketBottom = safe.topPx + 130
+            return count
+        }
+
+        // 1. Horizontal Top safe-zone rail pocket: renders horizontally along safe.topPx, never in center
+        val topBitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = android.graphics.Canvas(topBitmap)
+            canvas.drawColor(0xFF3A86FF.toInt())
+            // Also paint a large #000000 center void to prove the watermark still refuses the middle
+            val centerX0 = safe.leftPx + 180
+            val centerX1 = safe.rightPx - 180
+            val centerY0 = safe.topPx + 260
+            val centerY1 = safe.bottomPx - 260
+            canvas.drawRect(centerX0.toFloat(), centerY0.toFloat(), centerX1.toFloat(), centerY1.toFloat(), darkPaint)
+
+            val pocketLeft = safe.rightPx - 680
+            val pocketRight = safe.rightPx
+            val pocketTop = safe.topPx
+            val pocketBottom = safe.topPx + 80
             canvas.drawRect(
                 pocketLeft.toFloat(),
                 pocketTop.toFloat(),
@@ -1491,26 +1543,86 @@ class ExampleRobolectricTest {
 
             val placement = com.cptodix.rimalux.oled.wallpaper.platform.WallpaperExporter.applyShareWatermark(
                 context = context,
-                bitmap = bitmap,
+                bitmap = topBitmap,
                 patternTitle = "Silk Flow Ribbons",
                 paletteColors = listOf(0xFF00F5D4L, 0xFF3A86FFL)
             )
 
-            assertTrue(placement.leftPx >= safe.leftPx.toFloat())
-            assertTrue(placement.leftPx + placement.widthPx <= safe.rightPx.toFloat() + 0.5f)
-            assertTrue(placement.topPx >= safe.topPx.toFloat())
-            assertTrue(placement.topPx + placement.heightPx <= safe.bottomPx.toFloat() + 0.5f)
-
+            assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkEdge.TOP, placement.edge)
+            assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkOrientation.HORIZONTAL, placement.orientation)
+            assertEquals(safe.topPx.toFloat(), placement.topPx, 0.5f)
+            assertTrue(placement.leftPx >= pocketLeft - 10f && placement.leftPx + placement.widthPx <= pocketRight + 1f)
             assertTrue(
-                "Expected watermark X (${placement.leftPx}..${placement.leftPx + placement.widthPx}) inside dark pocket [$pocketLeft..$pocketRight]",
-                placement.leftPx >= pocketLeft - 10f && placement.leftPx + placement.widthPx <= pocketRight + 10f
+                "Expected rendered glyph pixels inside horizontal top placement box",
+                countNonBlackPixels(
+                    topBitmap,
+                    placement.leftPx.toInt(),
+                    placement.topPx.toInt(),
+                    (placement.leftPx + placement.widthPx).toInt(),
+                    (placement.topPx + placement.heightPx).toInt()
+                ) > 80
             )
-            assertTrue(
-                "Expected watermark Y (${placement.topPx}..${placement.topPx + placement.heightPx}) inside dark pocket [$pocketTop..$pocketBottom]",
-                placement.topPx >= pocketTop - 10f && placement.topPx + placement.heightPx <= pocketBottom + 10f
+            assertEquals(
+                "Center #000000 void must remain 100% untouched by watermark",
+                0,
+                countNonBlackPixels(topBitmap, centerX0 + 10, centerY0 + 10, centerX1 - 10, centerY1 - 10)
             )
         } finally {
-            bitmap.recycle()
+            topBitmap.recycle()
+        }
+
+        // 2. Vertical Left & Right side safe-zone rails: renders rotated vertically inside side rail bounds
+        for (testRightSide in listOf(false, true)) {
+            val sideBitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+            try {
+                val canvas = android.graphics.Canvas(sideBitmap)
+                canvas.drawColor(0xFFFF006E.toInt())
+                val pocketLeft = if (testRightSide) safe.rightPx - 80 else safe.leftPx
+                val pocketRight = if (testRightSide) safe.rightPx else safe.leftPx + 80
+                val pocketTop = safe.topPx + 320
+                val pocketBottom = safe.topPx + 1120
+                canvas.drawRect(
+                    pocketLeft.toFloat(),
+                    pocketTop.toFloat(),
+                    pocketRight.toFloat(),
+                    pocketBottom.toFloat(),
+                    darkPaint
+                )
+
+                val placement = com.cptodix.rimalux.oled.wallpaper.platform.WallpaperExporter.applyShareWatermark(
+                    context = context,
+                    bitmap = sideBitmap,
+                    patternTitle = "Silk Flow Ribbons",
+                    paletteColors = listOf(0xFF00F5D4L, 0xFFFF006EL)
+                )
+
+                val expectedEdge = if (testRightSide) {
+                    com.cptodix.rimalux.oled.wallpaper.engine.WatermarkEdge.RIGHT
+                } else {
+                    com.cptodix.rimalux.oled.wallpaper.engine.WatermarkEdge.LEFT
+                }
+                val expectedOrientation = if (testRightSide) {
+                    com.cptodix.rimalux.oled.wallpaper.engine.WatermarkOrientation.VERTICAL_CW
+                } else {
+                    com.cptodix.rimalux.oled.wallpaper.engine.WatermarkOrientation.VERTICAL_CCW
+                }
+                assertEquals(expectedEdge, placement.edge)
+                assertEquals(expectedOrientation, placement.orientation)
+                assertTrue("Vertical placement must be tall and narrow", placement.heightPx > placement.widthPx * 5f)
+                assertTrue(placement.topPx >= pocketTop - 10f && placement.topPx + placement.heightPx <= pocketBottom + 10f)
+                assertTrue(
+                    "Expected rendered rotated glyph pixels inside vertical ${expectedEdge.name} placement box",
+                    countNonBlackPixels(
+                        sideBitmap,
+                        placement.leftPx.toInt(),
+                        placement.topPx.toInt(),
+                        (placement.leftPx + placement.widthPx).toInt(),
+                        (placement.topPx + placement.heightPx).toInt()
+                    ) > 80
+                )
+            } finally {
+                sideBitmap.recycle()
+            }
         }
     }
 
@@ -1542,11 +1654,36 @@ class ExampleRobolectricTest {
     fun multiLanguageReadiness_resolvesSystemLocaleWithFallback_andRendersSelectorBetweenLikeAppAndAbout() {
         val context = ApplicationProvider.getApplicationContext<Context>()
 
-        // 1. Only en-US is currently shipped (no extra languages added yet)
-        assertEquals(listOf(com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.EN_US), com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.entries)
+        // 1. Both en-US (default) and id-ID (Bahasa Indonesia) are shipped
+        assertEquals(
+            listOf(
+                com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.EN_US,
+                com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.ID_ID
+            ),
+            com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.entries
+        )
         assertEquals("en-US", com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.DEFAULT.languageTag)
+        assertEquals("id-ID", com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.ID_ID.languageTag)
+        assertEquals("Bahasa Indonesia", com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.ID_ID.nativeName)
 
-        // 2. First-launch resolution with unsupported system locales falls back cleanly to en-US and persists
+        // 2. First-launch resolution picks id-ID for Indonesian system locales (modern "id-ID" and legacy "in-ID"/"in")
+        //    and falls back cleanly to en-US for unsupported locales
+        com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.clearStoredLanguageForTesting(context)
+        val resolvedFromModernId = com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.resolveOrInitializeLanguage(
+            context = context,
+            systemLocalesOverride = listOf(java.util.Locale.forLanguageTag("id-ID"))
+        )
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.ID_ID, resolvedFromModernId)
+
+        com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.clearStoredLanguageForTesting(context)
+        @Suppress("DEPRECATION")
+        val legacyInLocale = java.util.Locale("in", "ID")
+        val resolvedFromLegacyIn = com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.resolveOrInitializeLanguage(
+            context = context,
+            systemLocalesOverride = listOf(legacyInLocale)
+        )
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.ID_ID, resolvedFromLegacyIn)
+
         com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.clearStoredLanguageForTesting(context)
         val resolvedFromUnsupported = com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.resolveOrInitializeLanguage(
             context = context,
@@ -1554,8 +1691,34 @@ class ExampleRobolectricTest {
         )
         assertEquals(com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.EN_US, resolvedFromUnsupported)
 
-        // 3. BCP-47 3-tier negotiation engine is ready for future multi-language expansion
-        val futureSupported = listOf("en-US", "fr", "pt-PT", "pt-BR", "zh-Hans", "zh-Hant", "id", "he")
+        // 3. Verify Bahasa Indonesia (id-ID) Android Resources load cleanly from res/values-in/strings.xml
+        val idContext = com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.createLocalizedContext(
+            context,
+            com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.ID_ID
+        )
+        assertEquals("Rasio Hitam Pekat", idContext.getString(R.string.label_pitch_black_ratio))
+        assertEquals("Pola", idContext.getString(R.string.patterns_title))
+        assertEquals("Warna", idContext.getString(R.string.palettes_title))
+        assertEquals("Ganti Wallpaper Otomatis", idContext.getString(R.string.auto_master_toggle))
+        assertEquals("Bahasa", idContext.getString(R.string.label_language))
+        assertEquals(
+            "Dibuat secara prosedural oleh Rimalux · Pita Aliran Sutra",
+            idContext.getString(
+                R.string.share_watermark_text,
+                idContext.getString(R.string.pattern_silk_ribbons)
+            )
+        )
+        assertEquals("15 Menit", idContext.resources.getQuantityString(R.plurals.interval_desc_minutes, 15, 15))
+        assertEquals("Sutra Aurora", idContext.getString(R.string.palette_name_obsidian_aurora))
+
+        // Restore English default for subsequent UI assertions in this test
+        com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.setSelectedLanguage(
+            context,
+            com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.EN_US
+        )
+
+        // 4. BCP-47 3-tier negotiation engine handles scripts and regions deterministically
+        val futureSupported = listOf("en-US", "fr", "pt-PT", "pt-BR", "zh-Hans", "zh-Hant", "id-ID", "he")
         assertEquals(
             "pt-BR",
             com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.resolveBestSupportedTag(
@@ -1578,9 +1741,9 @@ class ExampleRobolectricTest {
             )
         )
         assertEquals(
-            "id",
+            "id-ID",
             com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.resolveBestSupportedTag(
-                systemLocales = listOf(java.util.Locale("in", "ID")),
+                systemLocales = listOf(legacyInLocale),
                 supportedTags = futureSupported
             )
         )
@@ -1602,15 +1765,15 @@ class ExampleRobolectricTest {
             )
         )
 
-        // 4. Every built-in starter palette maps to a localized @StringRes entry
+        // 5. Every built-in starter palette maps to a localized @StringRes entry in both English and Indonesian
         for (starter in StarterPalettes.defaults) {
             val resId = starter.nameResOrNull
             assertNotNull("Starter palette '${starter.id}' must map to @StringRes", resId)
-            val resolvedName = starter.resolveDisplayName(context)
-            assertTrue(resolvedName.isNotBlank())
+            assertTrue(starter.resolveDisplayName(context).isNotBlank())
+            assertTrue(starter.resolveDisplayName(idContext).isNotBlank())
         }
 
-        // 5. Verify low-emphasis Language selector sits strictly between Enjoying Rimalux? and About text
+        // 6. Verify low-emphasis Language selector sits strictly between Enjoying Rimalux? and About text
         composeTestRule.waitForIdle()
         val activity = composeTestRule.activity
         val viewModel = ViewModelProvider(
@@ -1644,19 +1807,179 @@ class ExampleRobolectricTest {
             aboutBounds.top >= langBounds.bottom - 1f
         )
 
-        // 6. Tap Language selector -> opens unified Language modal with English (US) selected
+        // 7. Tap Language selector -> opens unified Language modal with both English (US) and Bahasa Indonesia
         composeTestRule.onNodeWithTag("btn_open_language_selector").performClick()
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("dialog_language_selector").assertIsDisplayed()
         composeTestRule.onNodeWithTag("language_option_en-us").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("language_option_id-id").assertIsDisplayed()
         composeTestRule.onNode(
             hasText("English (US)") and hasAnyAncestor(hasTestTag("dialog_language_selector"))
         ).assertIsDisplayed()
+        composeTestRule.onNode(
+            hasText("Bahasa Indonesia") and hasAnyAncestor(hasTestTag("dialog_language_selector"))
+        ).assertIsDisplayed()
 
-        composeTestRule.onNodeWithTag("language_option_en-us").performClick()
+        // Switch to Bahasa Indonesia via the modal
+        composeTestRule.onNodeWithTag("language_option_id-id").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("dialog_language_selector").assertDoesNotExist()
-        assertEquals(com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.EN_US, viewModel.uiState.value.appLanguage)
+        assertEquals(
+            com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.ID_ID,
+            com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.getSavedLanguageOrNull(context)
+        )
+        // Reset back to default English so any subsequent test methods start clean
+        com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.setSelectedLanguage(
+            context,
+            com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.EN_US
+        )
+    }
+
+    @Test
+    fun monetizationPlayBilling_declaresPermissionAndProductIds_rendersLocalizedPrices_andHandlesTipPurchases() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        // 1. Verify merged AndroidManifest declares com.android.vending.BILLING + Play Billing client metadata
+        //    (the exact manifest entries Google Play Console inspects to enable In-App Products)
+        val pkgInfo = context.packageManager.getPackageInfo(
+            context.packageName,
+            android.content.pm.PackageManager.GET_PERMISSIONS
+        )
+        val requestedPermissions = pkgInfo.requestedPermissions?.toSet().orEmpty()
+        assertTrue(
+            "AndroidManifest must declare com.android.vending.BILLING for Google Play Console monetization",
+            "com.android.vending.BILLING" in requestedPermissions
+        )
+
+        val appInfo = context.packageManager.getApplicationInfo(
+            context.packageName,
+            android.content.pm.PackageManager.GET_META_DATA
+        )
+        val billingLibVersion = appInfo.metaData?.getString("com.google.android.play.billingclient.version")
+        assertNotNull(
+            "Merged AndroidManifest must contain com.google.android.play.billingclient.version metadata",
+            billingLibVersion
+        )
+        assertTrue(billingLibVersion!!.startsWith("8."))
+
+        // 2. Verify all 5 canonical Google Play Console One-Time Product IDs follow Play Console SKU rules
+        val expectedProductIds = listOf(
+            "1" to "rimalux_tip_1",
+            "3" to "rimalux_tip_3",
+            "5" to "rimalux_tip_5",
+            "10" to "rimalux_tip_10",
+            "20" to "rimalux_tip_20"
+        )
+        assertEquals(
+            expectedProductIds,
+            com.cptodix.rimalux.oled.wallpaper.model.TipProduct.entries.map { it.amountKey to it.productId }
+        )
+        val playConsoleSkuRegex = Regex("^[a-z0-9][a-z0-9_.]*$")
+        for (product in com.cptodix.rimalux.oled.wallpaper.model.TipProduct.entries) {
+            assertTrue(
+                "Product ID '${product.productId}' must satisfy Google Play Console SKU naming rules",
+                playConsoleSkuRegex.matches(product.productId)
+            )
+            assertEquals(product, com.cptodix.rimalux.oled.wallpaper.model.TipProduct.fromProductId(product.productId))
+        }
+
+        // 3. Verify ViewModel + Play Billing controller integration (localized catalog prices, launch, completed & pending events)
+        val catalogState = kotlinx.coroutines.flow.MutableStateFlow(
+            listOf(
+                com.cptodix.rimalux.oled.wallpaper.model.TipCatalogItem(
+                    product = com.cptodix.rimalux.oled.wallpaper.model.TipProduct.TIP_1,
+                    formattedPrice = "Rp 16.000",
+                    isStoreReady = true
+                ),
+                com.cptodix.rimalux.oled.wallpaper.model.TipCatalogItem(
+                    product = com.cptodix.rimalux.oled.wallpaper.model.TipProduct.TIP_3,
+                    formattedPrice = "Rp 49.000",
+                    isStoreReady = true
+                ),
+                com.cptodix.rimalux.oled.wallpaper.model.TipCatalogItem(
+                    product = com.cptodix.rimalux.oled.wallpaper.model.TipProduct.TIP_5,
+                    formattedPrice = "Rp 79.000",
+                    isStoreReady = true
+                ),
+                com.cptodix.rimalux.oled.wallpaper.model.TipCatalogItem(
+                    product = com.cptodix.rimalux.oled.wallpaper.model.TipProduct.TIP_10,
+                    formattedPrice = "Rp 159.000",
+                    isStoreReady = true
+                ),
+                com.cptodix.rimalux.oled.wallpaper.model.TipCatalogItem(
+                    product = com.cptodix.rimalux.oled.wallpaper.model.TipProduct.TIP_20,
+                    formattedPrice = "Rp 319.000",
+                    isStoreReady = true
+                )
+            )
+        )
+        val eventsFlow = kotlinx.coroutines.flow.MutableSharedFlow<com.cptodix.rimalux.oled.wallpaper.platform.TipBillingEvent>(extraBufferCapacity = 4)
+        val launchedProducts = mutableListOf<com.cptodix.rimalux.oled.wallpaper.model.TipProduct>()
+        var refreshCount = 0
+
+        val fakeBillingController = object : com.cptodix.rimalux.oled.wallpaper.platform.TipBillingController {
+            override val catalogFlow = catalogState
+            override val eventsFlow = eventsFlow
+
+            override suspend fun refreshCatalogAndPendingPurchases() {
+                refreshCount++
+            }
+
+            override suspend fun launchTipPurchase(
+                activity: android.app.Activity,
+                product: com.cptodix.rimalux.oled.wallpaper.model.TipProduct
+            ): com.cptodix.rimalux.oled.wallpaper.platform.TipLaunchResult {
+                launchedProducts.add(product)
+                return com.cptodix.rimalux.oled.wallpaper.platform.TipLaunchResult.BillingFlowLaunched
+            }
+
+            override fun close() = Unit
+        }
+
+        composeTestRule.waitForIdle()
+        val activity = composeTestRule.activity
+        val billingVm = RimaluxViewModel(
+            appContext = activity,
+            billingController = fakeBillingController
+        )
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals("Rp 49.000", billingVm.uiState.value.tipCatalog[1].formattedPrice)
+
+        billingVm.openSendThanksDialog()
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(billingVm.uiState.value.isSendThanksDialogOpen)
+        assertTrue("Opening Send a Thanks must refresh Play Billing catalog & pending purchases", refreshCount >= 1)
+
+        // Launch $3 tip (`rimalux_tip_3`) -> closes dialog and delegates to Google Play Billing flow
+        billingVm.purchaseThanksTip(activity, com.cptodix.rimalux.oled.wallpaper.model.TipProduct.TIP_3)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertFalse(billingVm.uiState.value.isSendThanksDialogOpen)
+        assertEquals(listOf(com.cptodix.rimalux.oled.wallpaper.model.TipProduct.TIP_3), launchedProducts)
+
+        // Simulate Google Play completing & consuming `rimalux_tip_3` -> shows localized price thank-you message
+        eventsFlow.tryEmit(
+            com.cptodix.rimalux.oled.wallpaper.platform.TipBillingEvent.PurchaseCompleted(
+                productIds = listOf("rimalux_tip_3"),
+                quantity = 1
+            )
+        )
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(
+            "Thank you so much for the Rp 49.000! Your tip means the world.",
+            billingVm.uiState.value.statusMessage
+        )
+
+        // Simulate Google Play PENDING purchase (e.g., cash/convenience store/bank transfer) -> shows pending confirmation
+        eventsFlow.tryEmit(
+            com.cptodix.rimalux.oled.wallpaper.platform.TipBillingEvent.PurchasePending(
+                productIds = listOf("rimalux_tip_10")
+            )
+        )
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(
+            "Your Rp 159.000 tip is pending payment confirmation in Google Play.",
+            billingVm.uiState.value.statusMessage
+        )
     }
 }

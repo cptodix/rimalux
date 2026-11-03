@@ -1,5 +1,6 @@
 package com.cptodix.rimalux.oled.wallpaper.ui
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -31,9 +32,15 @@ import androidx.annotation.StringRes
 import com.cptodix.rimalux.oled.wallpaper.model.RandomPaletteGenerator
 import com.cptodix.rimalux.oled.wallpaper.model.StarterPalettes
 import com.cptodix.rimalux.oled.wallpaper.model.StudioGestureAction
+import com.cptodix.rimalux.oled.wallpaper.model.TipCatalogItem
+import com.cptodix.rimalux.oled.wallpaper.model.TipProduct
 import com.cptodix.rimalux.oled.wallpaper.model.WallpaperTarget
 import com.cptodix.rimalux.oled.wallpaper.model.titleRes
 import com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager
+import com.cptodix.rimalux.oled.wallpaper.platform.GooglePlayTipBillingManager
+import com.cptodix.rimalux.oled.wallpaper.platform.TipBillingController
+import com.cptodix.rimalux.oled.wallpaper.platform.TipBillingEvent
+import com.cptodix.rimalux.oled.wallpaper.platform.TipLaunchResult
 import com.cptodix.rimalux.oled.wallpaper.platform.WallpaperApplyResult
 import com.cptodix.rimalux.oled.wallpaper.platform.WallpaperExporter
 import com.cptodix.rimalux.oled.wallpaper.platform.WallpaperRenderer
@@ -127,6 +134,7 @@ data class RimaluxUiState(
     val isBottomSheetOpen: Boolean = false,
     val isLikeAppDialogOpen: Boolean = false,
     val isSendThanksDialogOpen: Boolean = false,
+    val tipCatalog: List<TipCatalogItem> = TipCatalogItem.defaultCatalog,
     val isPatternLayoutDialogOpen: Boolean = false,
     val isColorFillDialogOpen: Boolean = false,
     val isLanguageDialogOpen: Boolean = false,
@@ -141,7 +149,8 @@ data class RimaluxUiState(
 class RimaluxViewModel(
     private val appContext: Context,
     private val repository: WallpaperPreferencesRepository = WallpaperPreferencesRepository(appContext),
-    private val clockMillis: () -> Long = { System.currentTimeMillis() }
+    private val clockMillis: () -> Long = { System.currentTimeMillis() },
+    private val billingController: TipBillingController = GooglePlayTipBillingManager(appContext)
 ) : ViewModel() {
 
     companion object {
@@ -195,6 +204,7 @@ class RimaluxViewModel(
 
     init {
         observeRepository()
+        observeBillingController()
         startForegroundScheduleMonitor()
     }
 
@@ -218,16 +228,28 @@ class RimaluxViewModel(
                     val initialTimestamps = StudioGestureAction.entries.associateWith { action ->
                         pendingGestureWrites[action] ?: (stored.lastGestureTimestamps[action] ?: 0L)
                     }
-                    val resolvedLanguage = if (stored.appLanguageTag.isNullOrBlank()) {
-                        val initial = AppLocaleManager.resolveOrInitializeLanguage(appContext)
-                        viewModelScope.launch {
-                            repository.setAppLanguageTag(initial.languageTag)
+                    val syncSavedLanguage = AppLocaleManager.getSavedLanguageOrNull(appContext)
+                    val resolvedLanguage = when {
+                        syncSavedLanguage != null -> {
+                            if (stored.appLanguageTag != syncSavedLanguage.languageTag) {
+                                viewModelScope.launch {
+                                    repository.setAppLanguageTag(syncSavedLanguage.languageTag)
+                                }
+                            }
+                            syncSavedLanguage
                         }
-                        initial
-                    } else {
-                        val storedLang = AppLanguage.fromTagOrDefault(stored.appLanguageTag)
-                        AppLocaleManager.setSelectedLanguage(appContext, storedLang)
-                        storedLang
+                        !stored.appLanguageTag.isNullOrBlank() -> {
+                            val storedLang = AppLanguage.fromTagOrDefault(stored.appLanguageTag)
+                            AppLocaleManager.setSelectedLanguage(appContext, storedLang)
+                            storedLang
+                        }
+                        else -> {
+                            val initial = AppLocaleManager.resolveOrInitializeLanguage(appContext)
+                            viewModelScope.launch {
+                                repository.setAppLanguageTag(initial.languageTag)
+                            }
+                            initial
+                        }
                     }
 
                     _uiState.update { state ->
@@ -1602,11 +1624,17 @@ class RimaluxViewModel(
         }
     }
 
-    // --- Persistent Background Interval Controls ---
+    // --- Persistent Background Interval & Foreground Billing Sync ---
     fun ensureAutoScheduleIfEnabled() {
         if (!hasInitializedFromStorage) return
         viewModelScope.launch {
             ensureAutoScheduleInternal(_uiState.value.config)
+        }
+    }
+
+    fun onAppResumed() {
+        viewModelScope.launch {
+            billingController.refreshCatalogAndPendingPurchases()
         }
     }
 
@@ -1781,6 +1809,9 @@ class RimaluxViewModel(
 
     fun openSendThanksDialog() {
         _uiState.update { it.copy(isLikeAppDialogOpen = false, isSendThanksDialogOpen = true) }
+        viewModelScope.launch {
+            billingController.refreshCatalogAndPendingPurchases()
+        }
     }
 
     fun closeSendThanksDialog() {
@@ -1793,24 +1824,79 @@ class RimaluxViewModel(
         val rateIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        val launched = runCatching {
+        runCatching {
             appContext.startActivity(rateIntent)
-            true
-        }.getOrElse {
+        }.onFailure {
             runCatching {
                 val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 appContext.startActivity(webIntent)
-                true
-            }.getOrDefault(false)
+            }
         }
         postStatus(localizedContext.getString(R.string.msg_rating_launched))
     }
 
-    fun sendThanksTip(amountLabel: String) {
+    fun purchaseThanksTip(activity: Activity?, product: TipProduct) {
         closeSendThanksDialog()
-        postStatus(localizedContext.getString(R.string.msg_thanks_sent, amountLabel))
+        if (activity == null) {
+            postStatus(localizedContext.getString(R.string.msg_tip_billing_unavailable))
+            return
+        }
+        viewModelScope.launch {
+            when (val result = billingController.launchTipPurchase(activity, product)) {
+                is TipLaunchResult.BillingFlowLaunched -> Unit
+                is TipLaunchResult.BillingUnavailable -> {
+                    postStatus(localizedContext.getString(R.string.msg_tip_billing_unavailable))
+                }
+                is TipLaunchResult.ProductNotConfigured -> {
+                    postStatus(localizedContext.getString(R.string.msg_tip_unavailable))
+                }
+                is TipLaunchResult.LaunchFailed -> {
+                    postStatus(localizedContext.getString(R.string.msg_tip_error, result.debugMessage))
+                }
+            }
+        }
+    }
+
+    private fun observeBillingController() {
+        viewModelScope.launch {
+            billingController.catalogFlow.collect { catalog ->
+                _uiState.update { it.copy(tipCatalog = catalog) }
+            }
+        }
+        viewModelScope.launch {
+            billingController.eventsFlow.collect { event ->
+                val locCtx = localizedContext
+                when (event) {
+                    is TipBillingEvent.PurchaseCompleted -> {
+                        val displayPrice = resolveTipDisplayLabel(event.productIds.firstOrNull(), locCtx)
+                        postStatus(locCtx.getString(R.string.msg_thanks_sent, displayPrice))
+                    }
+                    is TipBillingEvent.PurchasePending -> {
+                        val displayPrice = resolveTipDisplayLabel(event.productIds.firstOrNull(), locCtx)
+                        postStatus(locCtx.getString(R.string.msg_tip_pending, displayPrice))
+                    }
+                    is TipBillingEvent.UserCanceled -> Unit
+                    is TipBillingEvent.PurchaseError -> {
+                        val reason = event.debugMessage.ifBlank { "Code ${event.responseCode}" }
+                        postStatus(locCtx.getString(R.string.msg_tip_error, reason))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun resolveTipDisplayLabel(productId: String?, locCtx: Context): String {
+        val product = productId?.let(TipProduct::fromProductId) ?: TipProduct.TIP_5
+        val catalogMatch = _uiState.value.tipCatalog.firstOrNull { it.product == product }
+        return catalogMatch?.formattedPrice?.takeIf { it.isNotBlank() }
+            ?: locCtx.getString(product.fallbackLabelRes)
+    }
+
+    override fun onCleared() {
+        billingController.close()
+        super.onCleared()
     }
 
     class Factory(private val context: Context) : ViewModelProvider.Factory {

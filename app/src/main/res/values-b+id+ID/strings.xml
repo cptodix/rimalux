@@ -1,0 +1,5 @@
+<!--
+    Intentionally empty: all Bahasa Indonesia (id-ID / in) translations live in
+    `app/src/main/res/values-in/strings.xml` so there is a single source of truth.
+-->
+<resources />

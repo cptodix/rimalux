@@ -377,95 +377,156 @@ class CoreEnginePortabilityTest {
 
     @Test
     fun pureJvm_watermarkPlacementSolver_placesInsideSocialSafeZoneAndFindsDarkestEmptyPocket() {
-        // 1. Safe-zone crop invariants across portrait phone, foldable, and landscape tablet
+        // 1. Safe-zone perimeter invariants across portrait phone, 16:9 phone, foldable, and landscape tablet
         val dims = listOf(1080 to 2400, 1080 to 1920, 1840 to 2208, 2560 to 1600)
         for ((w, h) in dims) {
             val safe = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.computeSocialSafeZone(w, h)
-            assertTrue("Safe left must clear outer edge on ${w}x$h", safe.leftPx >= (w * 0.10f).toInt())
-            assertTrue("Safe right must clear outer/UI edge on ${w}x$h", safe.rightPx <= (w * 0.89f).toInt())
-            assertTrue("Safe top must clear story header on ${w}x$h", safe.topPx >= (h * 0.16f).toInt())
-            assertTrue("Safe bottom must clear bottom chrome on ${w}x$h", safe.bottomPx <= (h * 0.82f).toInt())
-            assertTrue("Safe width must be positive", safe.widthPx > w / 3)
-            assertTrue("Safe height must be positive", safe.heightPx > h / 3)
-
-            if (h >= w) {
-                // Must also stay strictly inside centered 4:5 portrait feed crop
-                val cropH45 = kotlin.math.min(h.toFloat(), w * 1.25f)
-                val cropTop45 = ((h - cropH45) * 0.5f).toInt()
-                val cropBottom45 = ((h + cropH45) * 0.5f).toInt()
-                assertTrue("Safe top (${safe.topPx}) must survive 4:5 crop ($cropTop45)", safe.topPx > cropTop45)
-                assertTrue("Safe bottom (${safe.bottomPx}) must survive 4:5 crop ($cropBottom45)", safe.bottomPx < cropBottom45)
-            }
+            assertTrue("Safe left must clear outer edge on ${w}x$h", safe.leftPx >= (w * 0.06f).toInt())
+            assertTrue("Safe right must clear outer edge on ${w}x$h", safe.rightPx <= (w * 0.94f).toInt())
+            assertTrue("Safe top must clear status/story header on ${w}x$h", safe.topPx >= (h * 0.10f).toInt())
+            assertTrue("Safe bottom must clear bottom chrome on ${w}x$h", safe.bottomPx <= (h * 0.89f).toInt())
+            assertTrue("Safe width must span broad canvas on ${w}x$h", safe.widthPx > (w * 0.70f).toInt())
+            assertTrue("Safe height must span broad canvas on ${w}x$h", safe.heightPx > (h * 0.60f).toInt())
         }
 
-        // 2. Dynamic empty #000000 pocket selection:
-        // Fill entire 1080x2400 image with bright neon cyan EXCEPT a #000000 pocket in the upper-right of the safe zone
         val w = 1080
         val h = 2400
         val safe = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.computeSocialSafeZone(w, h)
-        val pocketLeft = safe.rightPx - 360
-        val pocketRight = safe.rightPx - 10
-        val pocketTop = safe.topPx + 20
-        val pocketBottom = safe.topPx + 110
 
-        val placement = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.findOptimalPlacement(
+        // 2. Strict anti-center invariant:
+        // Even when ONLY the middle of the wallpaper is pure #000000 and all outer edges are bright cyan,
+        // the watermark MUST NEVER enter the center — it stays strictly pinned to one of the 4 perimeter rails.
+        val centerVoidPlacement = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.findOptimalPlacement(
+            widthPx = w,
+            heightPx = h,
+            textWidthPx = 280f,
+            textHeightPx = 22f
+        ) { x, y ->
+            val inCenterVoid = x in (safe.leftPx + 140)..(safe.rightPx - 140) &&
+                y in (safe.topPx + 180)..(safe.bottomPx - 180)
+            if (inCenterVoid) 0xFF000000.toInt() else 0xFF00F5D4.toInt()
+        }
+        val touchesPerimeterRail =
+            kotlin.math.abs(centerVoidPlacement.topPx - safe.topPx) <= 1f ||
+                kotlin.math.abs((centerVoidPlacement.topPx + centerVoidPlacement.heightPx) - safe.bottomPx) <= 1f ||
+                kotlin.math.abs(centerVoidPlacement.leftPx - safe.leftPx) <= 1f ||
+                kotlin.math.abs((centerVoidPlacement.leftPx + centerVoidPlacement.widthPx) - safe.rightPx) <= 1f
+        assertTrue(
+            "Watermark must stay strictly pinned to a safe-zone perimeter rail, got $centerVoidPlacement",
+            touchesPerimeterRail
+        )
+
+        // 3. Dynamic empty #000000 pocket selection across all 4 perimeter rails:
+        // 3a. Top horizontal rail pocket
+        val topPocketPlacement = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.findOptimalPlacement(
             widthPx = w,
             heightPx = h,
             textWidthPx = 260f,
-            textHeightPx = 18f
+            textHeightPx = 20f
         ) { x, y ->
-            if (x in pocketLeft..pocketRight && y in pocketTop..pocketBottom) {
+            if (x in (safe.rightPx - 340)..safe.rightPx && y in safe.topPx..(safe.topPx + 60)) {
                 0xFF000000.toInt()
             } else {
                 0xFF00F5D4.toInt()
             }
         }
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkEdge.TOP, topPocketPlacement.edge)
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkOrientation.HORIZONTAL, topPocketPlacement.orientation)
+        assertEquals(safe.topPx.toFloat(), topPocketPlacement.topPx, 0.5f)
+        assertTrue(topPocketPlacement.leftPx >= safe.rightPx - 350f)
+        assertTrue(topPocketPlacement.trueBlackFraction >= 0.90f)
 
-        assertTrue(placement.leftPx >= safe.leftPx - 0.01f)
-        assertTrue(placement.leftPx + placement.widthPx <= safe.rightPx + 0.01f)
-        assertTrue(placement.topPx >= safe.topPx - 0.01f)
-        assertTrue(placement.topPx + placement.heightPx <= safe.bottomPx + 0.01f)
-        assertTrue(
-            "Expected watermark X (${placement.leftPx}) inside #000000 pocket [$pocketLeft..$pocketRight]",
-            placement.leftPx >= pocketLeft - 12f && (placement.leftPx + placement.widthPx) <= pocketRight + 12f
-        )
-        assertTrue(
-            "Expected watermark Y (${placement.topPx}) inside #000000 pocket [$pocketTop..$pocketBottom]",
-            placement.topPx >= pocketTop - 10f && (placement.topPx + placement.heightPx) <= pocketBottom + 10f
-        )
-        assertTrue("Expected high true-black fraction in chosen pocket, got ${placement.trueBlackFraction}", placement.trueBlackFraction >= 0.90f)
-        assertTrue("Expected near-zero luminance in chosen pocket, got ${placement.meanLuminance}", placement.meanLuminance <= 0.05f)
+        // 3b. Bottom horizontal rail pocket
+        val bottomPocketPlacement = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.findOptimalPlacement(
+            widthPx = w,
+            heightPx = h,
+            textWidthPx = 260f,
+            textHeightPx = 20f
+        ) { x, y ->
+            if (x in safe.leftPx..(safe.leftPx + 340) && y in (safe.bottomPx - 60)..safe.bottomPx) {
+                0xFF000000.toInt()
+            } else {
+                0xFFFF006E.toInt()
+            }
+        }
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkEdge.BOTTOM, bottomPocketPlacement.edge)
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkOrientation.HORIZONTAL, bottomPocketPlacement.orientation)
+        assertEquals(safe.bottomPx - 20f, bottomPocketPlacement.topPx, 0.5f)
+        assertTrue(bottomPocketPlacement.leftPx <= safe.leftPx + 90f)
+        assertTrue(bottomPocketPlacement.trueBlackFraction >= 0.90f)
 
-        // 3. 0% True Black fallback: chooses dark navy pocket over bright yellow background
+        // 3c. Left vertical side rail pocket (-90° CCW)
+        val leftPocketPlacement = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.findOptimalPlacement(
+            widthPx = w,
+            heightPx = h,
+            textWidthPx = 260f,
+            textHeightPx = 20f
+        ) { x, y ->
+            if (x in safe.leftPx..(safe.leftPx + 60) && y in (safe.topPx + 420)..(safe.topPx + 780)) {
+                0xFF000000.toInt()
+            } else {
+                0xFF3A86FF.toInt()
+            }
+        }
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkEdge.LEFT, leftPocketPlacement.edge)
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkOrientation.VERTICAL_CCW, leftPocketPlacement.orientation)
+        assertEquals(safe.leftPx.toFloat(), leftPocketPlacement.leftPx, 0.5f)
+        assertEquals(20f, leftPocketPlacement.widthPx, 0.1f)
+        assertEquals(260f, leftPocketPlacement.heightPx, 0.1f)
+        assertTrue(leftPocketPlacement.topPx >= safe.topPx + 400f && leftPocketPlacement.topPx + leftPocketPlacement.heightPx <= safe.topPx + 800f)
+        assertTrue(leftPocketPlacement.trueBlackFraction >= 0.90f)
+
+        // 3d. Right vertical side rail pocket (+90° CW)
+        val rightPocketPlacement = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.findOptimalPlacement(
+            widthPx = w,
+            heightPx = h,
+            textWidthPx = 260f,
+            textHeightPx = 20f
+        ) { x, y ->
+            if (x in (safe.rightPx - 60)..safe.rightPx && y in (safe.topPx + 300)..(safe.topPx + 660)) {
+                0xFF000000.toInt()
+            } else {
+                0xFFFFBE0B.toInt()
+            }
+        }
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkEdge.RIGHT, rightPocketPlacement.edge)
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkOrientation.VERTICAL_CW, rightPocketPlacement.orientation)
+        assertEquals(safe.rightPx - 20f, rightPocketPlacement.leftPx, 0.5f)
+        assertEquals(20f, rightPocketPlacement.widthPx, 0.1f)
+        assertEquals(260f, rightPocketPlacement.heightPx, 0.1f)
+        assertTrue(rightPocketPlacement.topPx >= safe.topPx + 280f && rightPocketPlacement.topPx + rightPocketPlacement.heightPx <= safe.topPx + 680f)
+        assertTrue(rightPocketPlacement.trueBlackFraction >= 0.90f)
+
+        // 4. 0% True Black fallback: chooses dark navy perimeter pocket over bright yellow background
         val darkSpotPlacement = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.findOptimalPlacement(
             widthPx = w,
             heightPx = h,
             textWidthPx = 240f,
             textHeightPx = 18f
         ) { x, y ->
-            if (x in (safe.leftPx + 10)..(safe.leftPx + 340) && y in (safe.topPx + 40)..(safe.topPx + 130)) {
+            if (x in safe.leftPx..(safe.leftPx + 320) && y in safe.topPx..(safe.topPx + 60)) {
                 0xFF0A0D18.toInt()
             } else {
                 0xFFFFEA60.toInt()
             }
         }
-        assertTrue(darkSpotPlacement.leftPx <= safe.leftPx + 110f)
-        assertTrue(darkSpotPlacement.topPx <= safe.topPx + 130f)
+        assertEquals(com.cptodix.rimalux.oled.wallpaper.engine.WatermarkEdge.TOP, darkSpotPlacement.edge)
+        assertTrue(darkSpotPlacement.leftPx <= safe.leftPx + 90f)
         assertTrue(darkSpotPlacement.meanLuminance < 0.12f)
 
-        // 4. Barely-noticeable ink alpha stays whisper-low (~14%-22%)
+        // 5. Subtle muted ink alpha stays legible above OLED black crush & downscaling (~43%-60%) without glare
         val darkInk = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.computeSubtleWatermarkArgb(
             meanLuminance = 0.0f,
             paletteColors = listOf(0xFF00F5D4L)
         )
         val darkInkAlpha = (darkInk ushr 24) and 0xFF
-        assertTrue("Expected whisper-low alpha on #000000, got $darkInkAlpha", darkInkAlpha in 30..48)
+        assertTrue("Expected muted OLED-visible alpha on #000000, got $darkInkAlpha", darkInkAlpha in 108..136)
 
         val brightBgInk = com.cptodix.rimalux.oled.wallpaper.engine.WatermarkPlacementSolver.computeSubtleWatermarkArgb(
             meanLuminance = 0.80f,
             paletteColors = listOf(0xFFFFEA60L)
         )
         val brightBgAlpha = (brightBgInk ushr 24) and 0xFF
-        assertTrue("Expected subtle dark-ink alpha on bright pastel fill, got $brightBgAlpha", brightBgAlpha in 34..56)
+        assertTrue("Expected subtle dark-ink alpha on bright pastel fill, got $brightBgAlpha", brightBgAlpha in 120..156)
     }
 }

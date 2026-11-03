@@ -41,6 +41,17 @@ object AppLocaleManager {
     }
 
     /**
+     * Returns the synchronously persisted [AppLanguage] if one has already been chosen or
+     * initialized, or `null` on a clean install prior to initialization.
+     */
+    fun getSavedLanguageOrNull(context: Context): AppLanguage? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedTag = prefs.getString(KEY_APP_LANGUAGE_TAG, null)
+        if (savedTag.isNullOrBlank()) return null
+        return AppLanguage.fromTagOrDefault(savedTag)
+    }
+
+    /**
      * Resolves the active [AppLanguage]. On the very first launch after installation (when no
      * language tag has been persisted yet), matches [getDeviceSystemLocales] against supported
      * [AppLanguage] entries with fallback to `en-US`, and records that initial choice.
@@ -101,13 +112,31 @@ object AppLocaleManager {
 
     /**
      * Produces a configuration-overridden [Context] whose `Resources` and layout direction
-     * match [language].
+     * match [language]. Bridges modern ISO-639 codes (`id`, `he`, `yi`) with Android's
+     * canonical `resources.arsc` legacy codes (`in`, `iw`, `ji`) across API 24–36 and JDK 21+.
      */
     fun createLocalizedContext(base: Context, language: AppLanguage): Context {
         val targetLocale = language.toLocale()
         Locale.setDefault(targetLocale)
         val config = Configuration(base.resources.configuration)
-        config.setLocales(LocaleList(targetLocale))
+        val legacyCode = when (targetLocale.language.lowercase(Locale.ROOT)) {
+            "id" -> "in"
+            "he" -> "iw"
+            "yi" -> "ji"
+            else -> null
+        }
+        val localeList = if (legacyCode != null) {
+            @Suppress("DEPRECATION")
+            val legacyLocale = Locale(legacyCode, targetLocale.country)
+            if (legacyLocale.toLanguageTag() != targetLocale.toLanguageTag()) {
+                LocaleList(legacyLocale, targetLocale)
+            } else {
+                LocaleList(targetLocale)
+            }
+        } else {
+            LocaleList(targetLocale)
+        }
+        config.setLocales(localeList)
         config.setLayoutDirection(targetLocale)
         return base.createConfigurationContext(config)
     }

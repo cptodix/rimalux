@@ -156,7 +156,7 @@ Go to **Settings** -> **Secrets and variables** -> **Actions** -> **New reposito
    - **Ads:** Select *"No, my app does not contain ads"*.
    - **Content rating:** Complete the questionnaire under *Utility / Productivity / Personalization* (no user-generated online content, violence, gambling, or location sharing).
    - **Target audience and content:** Select target age groups **`18 and over`** (or `13–15`, `16–17`, `18 and over` — avoid under-13 age groups unless enrolling in Google Play's Families policy program).
-   - **Data safety:** Declare **No** to *"Does your app collect or share any of the required user data types?"* (Rimalux does not request `INTERNET` permission and performs zero analytics or tracking).
+   - **Data safety:** Rimalux itself runs 100% locally on-device with zero developer servers, analytics, or ad SDKs; only the official **Google Play Billing Library** communicates with Google Play for voluntary tip purchases (declare according to Google Play's [Play Billing Data Safety guide](https://developer.android.com/google/play/billing/data-safety)).
    - **Government / Financial / Health apps:** Select **No** / None.
 3. Open **Grow users -> Store presence -> Main store listing** and upload required graphics:
    - **Short description** (`<= 80` chars) & **Full description** (`<= 4,000` chars).
@@ -172,6 +172,24 @@ Go to **Settings** -> **Secrets and variables** -> **Actions** -> **New reposito
 
 > **Note for Personal Play Developer Accounts (Created After Nov 13, 2023):**
 > Google requires new personal developer accounts to run a **Closed testing** track with at least **12 opted-in testers for 14 continuous days** before unlocking Production access. You can publish updates directly to `internal` or `alpha` (Closed testing) via **Workflow 2** throughout that testing period.
+
+### 4.3 Configure "Send a Thanks" Tip Product IDs in Google Play Console
+
+Once an `.aab` built with Google Play Billing (`com.android.vending.BILLING` + `com.android.billingclient:billing-ktx`) has been uploaded to any track (e.g., Internal testing) and a **Payments profile / Merchant account** is linked under **Settings -> Payments profile**, Google Play Console unlocks **Monetize with Play -> Products -> In-app products (One-time products)**.
+
+Create and **Activate** these **5 One-Time Products** using the exact Product IDs below (defined in `TipProduct.kt`):
+
+| Tip Option in App | Product ID (Exact) | Product Name Example | Description Example | Reference Price (USD) |
+|---|---|---|---|---|
+| `$1` (`btn_tip_1`) | `rimalux_tip_1` | `Small Thanks ($1 Tip)` | `Voluntary $1 appreciation tip for Rimalux.` | `$1.00` |
+| `$3` (`btn_tip_3`) | `rimalux_tip_3` | `Kind Thanks ($3 Tip)` | `Voluntary $3 appreciation tip for Rimalux.` | `$3.00` |
+| `$5` (`btn_tip_5`) | `rimalux_tip_5` | `Warm Thanks ($5 Tip)` | `Voluntary $5 appreciation tip for Rimalux.` | `$5.00` |
+| `$10` (`btn_tip_10`) | `rimalux_tip_10` | `Generous Thanks ($10 Tip)` | `Voluntary $10 appreciation tip for Rimalux.` | `$10.00` |
+| `$20` (`btn_tip_20`) | `rimalux_tip_20` | `Super Thanks ($20 Tip)` | `Voluntary $20 appreciation tip for Rimalux.` | `$20.00` |
+
+- **Consumable / Repeat Tipping**: `PlayBillingManager.kt` automatically calls `consumeAsync` as soon as a purchase reaches `PURCHASED` state, which both acknowledges the transaction with Google Play (preventing 3-day auto-refunds) and allows supporters to tip again later if they choose.
+- **Automatic Local Currency Display**: When connected to Google Play Store, the `Send a Thanks` dialog automatically displays Google Play's localized currency price (`formattedPrice`, e.g., `Rp 16.000`, `$1.00`, `€1,09`) for each active product ID.
+- *(Optional)* If Google Play Console prompts for **Purchase options** on One-Time Products, create a standard **Buy** purchase option, mark it **Backwards compatible**, set regional prices, and click **Activate**.
 
 ---
 

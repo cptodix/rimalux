@@ -1,7 +1,6 @@
 package com.cptodix.rimalux.oled.wallpaper.engine
 
 import kotlin.math.abs
-import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -21,13 +20,40 @@ data class SafeZoneRect(
 }
 
 /**
- * Resolved bounding box and local background telemetry for a share-only subtle watermark.
+ * Orientation of the rendered share watermark along the perimeter of [SafeZoneRect].
+ */
+enum class WatermarkOrientation {
+    /** Standard horizontal text (`0°`), used along the top and bottom safe-zone rails. */
+    HORIZONTAL,
+
+    /** Vertical text rotated `-90°` (reading bottom-to-top), used along the left safe-zone rail. */
+    VERTICAL_CCW,
+
+    /** Vertical text rotated `+90°` (reading top-to-bottom), used along the right safe-zone rail. */
+    VERTICAL_CW
+}
+
+/**
+ * Perimeter rail of [SafeZoneRect] on which the watermark is anchored.
+ */
+enum class WatermarkEdge {
+    TOP,
+    BOTTOM,
+    LEFT,
+    RIGHT
+}
+
+/**
+ * Resolved axis-aligned bounding box, orientation, and local background telemetry
+ * for a share-only subtle perimeter watermark.
  */
 data class WatermarkPlacement(
     val leftPx: Float,
     val topPx: Float,
     val widthPx: Float,
     val heightPx: Float,
+    val orientation: WatermarkOrientation,
+    val edge: WatermarkEdge,
     val meanLuminance: Float,
     val trueBlackFraction: Float,
     val safeZone: SafeZoneRect
@@ -35,18 +61,21 @@ data class WatermarkPlacement(
 
 /**
  * Pure Kotlin (zero Android/Compose dependencies) social-media safe-zone calculator and
- * integral-image emptiness solver for placing subtle share watermarks into the darkest,
- * least intrusive pocket of a rendered wallpaper.
+ * integral-image emptiness solver for placing subtle share watermarks strictly along the
+ * perimeter edges (horizontal top/bottom or vertical left/right) of the social safe zone—never
+ * across the interior focal area of a wallpaper.
  */
 object WatermarkPlacementSolver {
 
     private const val SUB_SAMPLES = 2
+    private const val HORIZONTAL_STEPS = 48
+    private const val VERTICAL_STEPS = 64
 
     /**
-     * Computes a general social media safe-zone rectangle that survives:
-     * - 9:16 Stories / Reels / Shorts / TikTok crops and top/bottom/right UI chrome overlays,
-     * - 4:5 portrait feed center crops (Instagram, Threads, LinkedIn) and 3:4 feed previews,
-     * - Rounded screen corners and horizontal side gutters across portrait, foldable, and landscape ratios.
+     * Computes a social media safe-zone perimeter rectangle that survives:
+     * - 9:16 Stories / Reels / Shorts / TikTok crops and top header / bottom reply UI chrome,
+     * - Horizontal side crops and rounded screen corners across portrait, foldable, and landscape ratios,
+     * while keeping the 4 perimeter rails cleanly near the outer margins away from the center artwork.
      */
     fun computeSocialSafeZone(widthPx: Int, heightPx: Int): SafeZoneRect {
         val w = widthPx.coerceAtLeast(1)
@@ -60,32 +89,26 @@ object WatermarkPlacementSolver {
         val rawBottom: Float
 
         if (h >= w) {
-            // Portrait / square: intersect 9:16 story safe frame with centered 4:5 portrait feed crop
-            val cropW916 = min(wf, hf * (9f / 16f))
-            val left916 = (wf - cropW916) * 0.5f + cropW916 * 0.10f
-            val right916 = (wf + cropW916) * 0.5f - cropW916 * 0.12f
-            rawLeft = max(wf * 0.10f, left916)
-            rawRight = min(wf * 0.88f, right916)
+            // Portrait / foldable: clear horizontal 4:5 / phone side gutters and rounded corners
+            val cropW45 = min(wf, hf * 0.80f)
+            val leftSide = (wf - cropW45) * 0.5f + cropW45 * 0.065f
+            val rightSide = (wf + cropW45) * 0.5f - cropW45 * 0.065f
+            rawLeft = max(wf * 0.065f, leftSide)
+            rawRight = min(wf * 0.935f, rightSide)
 
+            // Clear 9:16 top story header/progress bar and bottom reply/caption chrome
             val cropH916 = min(hf, wf * (16f / 9f))
-            val top916 = (hf - cropH916) * 0.5f + cropH916 * 0.16f
-            val bottom916 = (hf + cropH916) * 0.5f - cropH916 * 0.21f
-
-            val cropH45 = min(hf, wf * 1.25f)
-            val top45 = (hf - cropH45) * 0.5f + cropH45 * 0.08f
-            val bottom45 = (hf + cropH45) * 0.5f - cropH45 * 0.08f
-
-            rawTop = max(hf * 0.18f, max(top916, top45))
-            rawBottom = min(hf * 0.80f, min(bottom916, bottom45))
+            val top916 = (hf - cropH916) * 0.5f + cropH916 * 0.065f
+            val bottom916 = (hf + cropH916) * 0.5f - cropH916 * 0.095f
+            rawTop = max(hf * 0.12f, top916)
+            rawBottom = min(hf * 0.85f, bottom916)
         } else {
-            // Landscape / wide tablet: intersect 4:3 horizontal and 16:9 vertical safe interiors
-            val cropW43 = min(wf, hf * (4f / 3f))
-            rawLeft = max(wf * 0.12f, (wf - cropW43) * 0.5f + cropW43 * 0.08f)
-            rawRight = min(wf * 0.88f, (wf + cropW43) * 0.5f - cropW43 * 0.08f)
-
+            // Landscape / wide tablet: perimeter margins clearing 16:9 / status & dock bars
             val cropH169 = min(hf, wf * (9f / 16f))
-            rawTop = max(hf * 0.16f, (hf - cropH169) * 0.5f + cropH169 * 0.12f)
-            rawBottom = min(hf * 0.82f, (hf + cropH169) * 0.5f - cropH169 * 0.14f)
+            rawLeft = wf * 0.065f
+            rawRight = wf * 0.935f
+            rawTop = max(hf * 0.11f, (hf - cropH169) * 0.5f + cropH169 * 0.10f)
+            rawBottom = min(hf * 0.88f, (hf + cropH169) * 0.5f - cropH169 * 0.12f)
         }
 
         val finalLeft = rawLeft.roundToInt().coerceIn(0, (w - 1).coerceAtLeast(0))
@@ -102,9 +125,14 @@ object WatermarkPlacementSolver {
     }
 
     /**
-     * Evaluates the rendered pixel buffer using a 2D summed-area table over the social safe zone
-     * (plus a surrounding halo border) and locates the emptiest / darkest `#000000` placement
-     * for a watermark box of size `[textWidthPx, textHeightPx]`.
+     * Evaluates the rendered pixel buffer using a 2D summed-area table and locates the
+     * emptiest / darkest `#000000` placement strictly along the 4 perimeter rails of [SafeZoneRect]:
+     * - [WatermarkEdge.BOTTOM] (`HORIZONTAL`)
+     * - [WatermarkEdge.TOP] (`HORIZONTAL`)
+     * - [WatermarkEdge.LEFT] (`VERTICAL_CCW`, `-90°`)
+     * - [WatermarkEdge.RIGHT] (`VERTICAL_CW`, `+90°`)
+     *
+     * The interior / center of the wallpaper is never considered.
      *
      * Note: [pixelArgbAt] is queried in monotonically non-decreasing `y` order so callers can
      * back it with a lightweight single-row scanline buffer.
@@ -114,32 +142,36 @@ object WatermarkPlacementSolver {
         heightPx: Int,
         textWidthPx: Float,
         textHeightPx: Float,
-        gridBaseResolution: Int = 128,
+        gridBaseResolution: Int = 180,
         pixelArgbAt: (x: Int, y: Int) -> Int
     ): WatermarkPlacement {
         val w = widthPx.coerceAtLeast(1)
         val h = heightPx.coerceAtLeast(1)
         val safeZone = computeSocialSafeZone(w, h)
 
-        val boxW = textWidthPx.coerceIn(1f, safeZone.widthPx.toFloat())
-        val boxH = textHeightPx.coerceIn(1f, safeZone.heightPx.toFloat())
+        val rawSpan = textWidthPx.coerceAtLeast(1f)
+        val rawThickness = textHeightPx.coerceAtLeast(1f)
 
-        val haloX = max(8f, boxH * 2.4f)
-        val haloY = max(8f, boxH * 2.0f)
-        val padTight = max(2f, boxH * 0.35f)
+        val horizW = rawSpan.coerceIn(1f, safeZone.widthPx.toFloat())
+        val horizH = rawThickness.coerceIn(1f, safeZone.heightPx.toFloat())
+        val vertW = rawThickness.coerceIn(1f, safeZone.widthPx.toFloat())
+        val vertH = rawSpan.coerceIn(1f, safeZone.heightPx.toFloat())
 
-        val scanLeft = (safeZone.leftPx - haloX.roundToInt()).coerceAtLeast(0)
-        val scanRight = (safeZone.rightPx + haloX.roundToInt()).coerceAtMost(w)
-        val scanTop = (safeZone.topPx - haloY.roundToInt()).coerceAtLeast(0)
-        val scanBottom = (safeZone.bottomPx + haloY.roundToInt()).coerceAtMost(h)
+        val haloPad = max(8f, rawThickness * 2.2f)
+        val padTight = max(2f, rawThickness * 0.35f)
+
+        val scanLeft = (safeZone.leftPx - haloPad.roundToInt()).coerceAtLeast(0)
+        val scanRight = (safeZone.rightPx + haloPad.roundToInt()).coerceAtMost(w)
+        val scanTop = (safeZone.topPx - haloPad.roundToInt()).coerceAtLeast(0)
+        val scanBottom = (safeZone.bottomPx + haloPad.roundToInt()).coerceAtMost(h)
 
         val scanW = (scanRight - scanLeft).coerceAtLeast(1)
         val scanH = (scanBottom - scanTop).coerceAtLeast(1)
 
-        val cols = gridBaseResolution.coerceIn(32, 200)
+        val cols = gridBaseResolution.coerceIn(32, 240)
         val rows = ((cols.toFloat() * scanH.toFloat()) / scanW.toFloat())
             .roundToInt()
-            .coerceIn(32, 260)
+            .coerceIn(32, 360)
 
         val cellCount = cols * rows
         val cellCost = DoubleArray(cellCount)
@@ -210,99 +242,198 @@ object WatermarkPlacementSolver {
             }
         }
 
-        fun rectMean(sat: DoubleArray, rx0: Float, ry0: Float, rx1: Float, ry1: Float): Double {
-            val gx0 = (((rx0 - scanLeft) / scanW) * cols).toInt().coerceIn(0, cols - 1)
-            val gx1 = (((rx1 - scanLeft) / scanW) * cols + 0.999f).toInt().coerceIn(gx0 + 1, cols)
-            val gy0 = (((ry0 - scanTop) / scanH) * rows).toInt().coerceIn(0, rows - 1)
-            val gy1 = (((ry1 - scanTop) / scanH) * rows + 0.999f).toInt().coerceIn(gy0 + 1, rows)
-            val sum = sat[gy1 * stride + gx1] -
-                sat[gy0 * stride + gx1] -
-                sat[gy1 * stride + gx0] +
-                sat[gy0 * stride + gx0]
-            val area = (gx1 - gx0) * (gy1 - gy0)
-            return sum / area.toDouble()
+        fun sampleSat(sat: DoubleArray, fx: Float, fy: Float): Double {
+            val cx = fx.coerceIn(0f, cols.toFloat())
+            val cy = fy.coerceIn(0f, rows.toFloat())
+            val ix0 = cx.toInt().coerceIn(0, cols)
+            val iy0 = cy.toInt().coerceIn(0, rows)
+            val ix1 = (ix0 + 1).coerceAtMost(cols)
+            val iy1 = (iy0 + 1).coerceAtMost(rows)
+            val dx = (cx - ix0.toFloat()).toDouble()
+            val dy = (cy - iy0.toFloat()).toDouble()
+
+            val s00 = sat[iy0 * stride + ix0]
+            val s10 = sat[iy0 * stride + ix1]
+            val s01 = sat[iy1 * stride + ix0]
+            val s11 = sat[iy1 * stride + ix1]
+
+            val top = s00 + (s10 - s00) * dx
+            val bottom = s01 + (s11 - s01) * dx
+            return top + (bottom - top) * dy
         }
 
-        val minLeft = safeZone.leftPx.toFloat()
-        val maxLeft = max(minLeft, safeZone.rightPx.toFloat() - boxW)
-        val minTop = safeZone.topPx.toFloat()
-        val maxTop = max(minTop, safeZone.bottomPx.toFloat() - boxH)
+        fun rectMean(sat: DoubleArray, rx0: Float, ry0: Float, rx1: Float, ry1: Float): Double {
+            val fx0 = (((rx0 - scanLeft) / scanW) * cols).coerceIn(0f, cols - 0.01f)
+            val fx1 = (((rx1 - scanLeft) / scanW) * cols).coerceIn(fx0 + 0.01f, cols.toFloat())
+            val fy0 = (((ry0 - scanTop) / scanH) * rows).coerceIn(0f, rows - 0.01f)
+            val fy1 = (((ry1 - scanTop) / scanH) * rows).coerceIn(fy0 + 0.01f, rows.toFloat())
+            val sum = sampleSat(sat, fx1, fy1) -
+                sampleSat(sat, fx1, fy0) -
+                sampleSat(sat, fx0, fy1) +
+                sampleSat(sat, fx0, fy0)
+            val area = (fx1 - fx0).toDouble() * (fy1 - fy0).toDouble()
+            return (sum / area).coerceAtLeast(0.0)
+        }
 
-        val stepsX = if (maxLeft - minLeft > 0.5f) 40 else 0
-        val stepsY = if (maxTop - minTop > 0.5f) 56 else 0
+        val safeLeft = safeZone.leftPx.toFloat()
+        val safeRight = safeZone.rightPx.toFloat()
+        val safeTop = safeZone.topPx.toFloat()
+        val safeBottom = safeZone.bottomPx.toFloat()
 
-        val centerCanvasX = w * 0.5f
-        val centerCanvasY = h * 0.5f
-        val halfDiag = hypot(centerCanvasX, centerCanvasY).coerceAtLeast(1f)
+        val fitsHoriz = rawSpan <= safeZone.widthPx * 1.02f
+        val fitsVert = rawSpan <= safeZone.heightPx * 1.02f
+        val evalHoriz = fitsHoriz || !fitsVert
+        val evalVert = fitsVert || !fitsHoriz
 
         var bestScore = Double.POSITIVE_INFINITY
-        var bestLeft = minLeft
-        var bestTop = maxTop
+        var bestLeft = safeLeft
+        var bestTop = max(safeTop, safeBottom - horizH)
+        var bestW = horizW
+        var bestH = horizH
+        var bestOrientation = WatermarkOrientation.HORIZONTAL
+        var bestEdge = WatermarkEdge.BOTTOM
 
-        for (iy in 0..stepsY) {
-            val v = if (stepsY > 0) iy.toFloat() / stepsY.toFloat() else 1f
-            val candTop = minTop + (maxTop - minTop) * v
-            for (ix in 0..stepsX) {
-                val u = if (stepsX > 0) ix.toFloat() / stepsX.toFloat() else 0f
-                val candLeft = minLeft + (maxLeft - minLeft) * u
-
-                val coreCost = rectMean(
-                    costSat,
-                    candLeft - padTight,
-                    candTop - padTight,
-                    candLeft + boxW + padTight,
-                    candTop + boxH + padTight
-                )
-                val haloCost = rectMean(
-                    costSat,
-                    candLeft - haloX,
-                    candTop - haloY,
-                    candLeft + boxW + haloX,
-                    candTop + boxH + haloY
-                )
-
-                // Subtle compositional tie-breaker (< 0.004) when multiple spots are equally empty:
-                // favor lower safe-zone corners away from the focal center of the wallpaper.
-                val edgeDist = min(u, 1f - u) * 2f
-                val boxMidX = candLeft + boxW * 0.5f
-                val boxMidY = candTop + boxH * 0.5f
-                val centerProximity = 1f - (hypot(boxMidX - centerCanvasX, boxMidY - centerCanvasY) / halfDiag)
-                    .coerceIn(0f, 1f)
-                val tieBias = (1.0 - v) * 0.0018 +
-                    edgeDist * 0.0011 +
-                    u * 0.0002 +
-                    centerProximity * 0.0005
-
-                val totalScore = 0.74 * coreCost + 0.26 * haloCost + tieBias
-                if (totalScore < bestScore) {
-                    bestScore = totalScore
-                    bestLeft = candLeft
-                    bestTop = candTop
-                }
+        fun evaluateCandidate(
+            candLeft: Float,
+            candTop: Float,
+            candW: Float,
+            candH: Float,
+            orientation: WatermarkOrientation,
+            edge: WatermarkEdge,
+            tieBias: Double
+        ) {
+            val coreCost = rectMean(
+                costSat,
+                candLeft - padTight,
+                candTop - padTight,
+                candLeft + candW + padTight,
+                candTop + candH + padTight
+            )
+            val haloCost = rectMean(
+                costSat,
+                candLeft - haloPad,
+                candTop - haloPad,
+                candLeft + candW + haloPad,
+                candTop + haloPad.let { candH + it }
+            )
+            val totalScore = 0.74 * coreCost + 0.26 * haloCost + tieBias
+            if (totalScore < bestScore) {
+                bestScore = totalScore
+                bestLeft = candLeft
+                bestTop = candTop
+                bestW = candW
+                bestH = candH
+                bestOrientation = orientation
+                bestEdge = edge
             }
         }
 
+        if (evalHoriz) {
+            val minX = safeLeft
+            val maxX = max(minX, safeRight - horizW)
+            val stepsX = if (maxX - minX > 0.5f) HORIZONTAL_STEPS else 0
+
+            // 1. Bottom horizontal safe-zone rail
+            val bottomY = max(safeTop, safeBottom - horizH)
+            for (ix in 0..stepsX) {
+                val u = if (stepsX > 0) ix.toFloat() / stepsX.toFloat() else 0.5f
+                val candX = minX + (maxX - minX) * u
+                val tieBias = 0.0000 + abs(u - 0.5f) * 0.0008
+                evaluateCandidate(
+                    candLeft = candX,
+                    candTop = bottomY,
+                    candW = horizW,
+                    candH = horizH,
+                    orientation = WatermarkOrientation.HORIZONTAL,
+                    edge = WatermarkEdge.BOTTOM,
+                    tieBias = tieBias
+                )
+            }
+
+            // 2. Top horizontal safe-zone rail
+            val topY = safeTop
+            for (ix in 0..stepsX) {
+                val u = if (stepsX > 0) ix.toFloat() / stepsX.toFloat() else 0.5f
+                val candX = minX + (maxX - minX) * u
+                val tieBias = 0.0006 + abs(u - 0.5f) * 0.0008
+                evaluateCandidate(
+                    candLeft = candX,
+                    candTop = topY,
+                    candW = horizW,
+                    candH = horizH,
+                    orientation = WatermarkOrientation.HORIZONTAL,
+                    edge = WatermarkEdge.TOP,
+                    tieBias = tieBias
+                )
+            }
+        }
+
+        if (evalVert) {
+            val minY = safeTop
+            val maxY = max(minY, safeBottom - vertH)
+            val stepsY = if (maxY - minY > 0.5f) VERTICAL_STEPS else 0
+
+            // 3. Left vertical safe-zone rail (-90° reading bottom-to-top)
+            val leftX = safeLeft
+            for (iy in 0..stepsY) {
+                val v = if (stepsY > 0) iy.toFloat() / stepsY.toFloat() else 0.5f
+                val candY = minY + (maxY - minY) * v
+                val tieBias = 0.0011 + abs(v - 0.5f) * 0.0007
+                evaluateCandidate(
+                    candLeft = leftX,
+                    candTop = candY,
+                    candW = vertW,
+                    candH = vertH,
+                    orientation = WatermarkOrientation.VERTICAL_CCW,
+                    edge = WatermarkEdge.LEFT,
+                    tieBias = tieBias
+                )
+            }
+
+            // 4. Right vertical safe-zone rail (+90° reading top-to-bottom; gently favors upper half when empty)
+            val rightX = max(safeLeft, safeRight - vertW)
+            for (iy in 0..stepsY) {
+                val v = if (stepsY > 0) iy.toFloat() / stepsY.toFloat() else 0.35f
+                val candY = minY + (maxY - minY) * v
+                val tieBias = 0.0015 + abs(v - 0.35f) * 0.0008
+                evaluateCandidate(
+                    candLeft = rightX,
+                    candTop = candY,
+                    candW = vertW,
+                    candH = vertH,
+                    orientation = WatermarkOrientation.VERTICAL_CW,
+                    edge = WatermarkEdge.RIGHT,
+                    tieBias = tieBias
+                )
+            }
+        }
+
+        val clampedLeft = bestLeft.coerceIn(safeLeft, max(safeLeft, safeRight - bestW))
+        val clampedTop = bestTop.coerceIn(safeTop, max(safeTop, safeBottom - bestH))
+
         val finalMeanLum = rectMean(
             lumSat,
-            bestLeft,
-            bestTop,
-            bestLeft + boxW,
-            bestTop + boxH
+            clampedLeft,
+            clampedTop,
+            clampedLeft + bestW,
+            clampedTop + bestH
         ).toFloat().coerceIn(0f, 1f)
 
         val finalBlackFraction = rectMean(
             blackSat,
-            bestLeft,
-            bestTop,
-            bestLeft + boxW,
-            bestTop + boxH
+            clampedLeft,
+            clampedTop,
+            clampedLeft + bestW,
+            clampedTop + bestH
         ).toFloat().coerceIn(0f, 1f)
 
         return WatermarkPlacement(
-            leftPx = bestLeft.coerceIn(minLeft, maxLeft),
-            topPx = bestTop.coerceIn(minTop, maxTop),
-            widthPx = boxW,
-            heightPx = boxH,
+            leftPx = clampedLeft,
+            topPx = clampedTop,
+            widthPx = bestW,
+            heightPx = bestH,
+            orientation = bestOrientation,
+            edge = bestEdge,
             meanLuminance = finalMeanLum,
             trueBlackFraction = finalBlackFraction,
             safeZone = safeZone
@@ -310,8 +441,12 @@ object WatermarkPlacementSolver {
     }
 
     /**
-     * Computes a barely-noticeable, low-contrast ARGB ink color tailored to the local background
-     * luminance of the chosen watermark spot and subtly harmonized with [paletteColors].
+     * Computes a subtle, muted ARGB ink color tailored to the local background luminance
+     * of the chosen watermark spot and softly harmonized with [paletteColors].
+     *
+     * Calibrated so glyphs remain clearly legible above OLED near-black gamma roll-off,
+     * system share-sheet thumbnail downscaling, and social/messaging JPEG compression
+     * while staying understated (~45%–58% opacity) so the wallpaper artwork dominates.
      */
     fun computeSubtleWatermarkArgb(
         meanLuminance: Float,
@@ -319,12 +454,13 @@ object WatermarkPlacementSolver {
     ): Int {
         val lum = meanLuminance.coerceIn(0f, 1f)
         if (lum > 0.48f) {
-            // Bright / pastel background (e.g. 0% True Black): whisper-dark charcoal at ~18% alpha
-            val darkAlpha = 46
-            return (darkAlpha shl 24) or (8 shl 16) or (8 shl 8) or 10
+            // Bright / pastel background (e.g. 0% True Black): muted charcoal at ~50%–58% alpha
+            val tBright = ((lum - 0.48f) / 0.52f).coerceIn(0f, 1f)
+            val darkAlpha = (128f + tBright * 20f).roundToInt().coerceIn(128, 148)
+            return (darkAlpha shl 24) or (10 shl 16) or (10 shl 8) or 14
         }
 
-        // Pure #000000 or dark colored region: ~15% opacity neutral-white kissed 18% with palette tint
+        // Pure #000000 or dark/mid colored region: muted silver-white kissed 22% with palette tint
         var accentR = 246
         var accentG = 246
         var accentB = 250
@@ -345,16 +481,16 @@ object WatermarkPlacementSolver {
             }
         }
 
-        val mix = 0.18f
-        val r = (246f * (1f - mix) + accentR * mix).roundToInt().coerceIn(200, 255)
-        val g = (246f * (1f - mix) + accentG * mix).roundToInt().coerceIn(200, 255)
-        val b = (250f * (1f - mix) + accentB * mix).roundToInt().coerceIn(200, 255)
+        val mix = 0.22f
+        val r = (246f * (1f - mix) + accentR * mix).roundToInt().coerceIn(210, 255)
+        val g = (246f * (1f - mix) + accentG * mix).roundToInt().coerceIn(210, 255)
+        val b = (250f * (1f - mix) + accentB * mix).roundToInt().coerceIn(210, 255)
 
         val alpha = if (lum <= 0.08f) {
-            38 // ~14.9% alpha on pure #000000 OLED void: barely noticeable, zero glare
+            116 // ~45.5% alpha on #000000 OLED void (~#717175): crisp, zero white glare, immune to OLED black crush
         } else {
             val t = ((lum - 0.08f) / 0.40f).coerceIn(0f, 1f)
-            (40f + t * 14f).roundToInt().coerceIn(40, 54)
+            (124f + t * 40f).roundToInt().coerceIn(124, 164)
         }
 
         return (alpha shl 24) or (r shl 16) or (g shl 8) or b

@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cptodix.rimalux.oled.wallpaper.R
+import com.cptodix.rimalux.oled.wallpaper.platform.findActivity
 import com.cptodix.rimalux.oled.wallpaper.ui.components.ColorFillStyleDialog
 import com.cptodix.rimalux.oled.wallpaper.ui.components.LanguageSelectorDialog
 import com.cptodix.rimalux.oled.wallpaper.ui.components.LikeAppDialog
@@ -72,8 +73,10 @@ fun RimaluxApp(
 
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_START) {
-                viewModel.ensureAutoScheduleIfEnabled()
+            when (event) {
+                Lifecycle.Event.ON_START -> viewModel.ensureAutoScheduleIfEnabled()
+                Lifecycle.Event.ON_RESUME -> viewModel.onAppResumed()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -116,7 +119,7 @@ fun RimaluxApp(
     LaunchedEffect(uiState.pendingLocaleRefreshToken) {
         if (uiState.pendingLocaleRefreshToken == 0L) return@LaunchedEffect
         viewModel.consumePendingLocaleRefresh()
-        (context as? Activity)?.recreate()
+        context.findActivity()?.recreate()
     }
 
     val activePaletteColors = uiState.preview?.colors ?: uiState.stagedColors
@@ -320,7 +323,10 @@ fun RimaluxApp(
 
         if (uiState.isSendThanksDialogOpen) {
             SendThanksDialog(
-                onSendTip = viewModel::sendThanksTip,
+                tipCatalog = uiState.tipCatalog,
+                onSelectTip = { product ->
+                    viewModel.purchaseThanksTip(context.findActivity(), product)
+                },
                 onDismiss = viewModel::closeSendThanksDialog
             )
         }

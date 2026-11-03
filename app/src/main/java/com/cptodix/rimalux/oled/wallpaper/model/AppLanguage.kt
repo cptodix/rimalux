@@ -6,7 +6,8 @@ import java.util.Locale
  * Single-source registry of supported application languages.
  *
  * HOW TO ADD A NEW LANGUAGE IN THE FUTURE:
- * 1. Add translated resources in `app/src/main/res/values-<bcp47>/strings.xml`.
+ * 1. Add translated resources in `app/src/main/res/values-<lang>/strings.xml`
+ *    (note: Android uses `values-in` for Indonesian `id-ID`).
  * 2. Add `<locale android:name="<bcp47>" />` in `app/src/main/res/xml/locales_config.xml`.
  * 3. Add an enum entry below with its BCP-47 [languageTag] and [nativeName] (endonym).
  *
@@ -20,6 +21,10 @@ enum class AppLanguage(
     EN_US(
         languageTag = "en-US",
         nativeName = "English (US)"
+    ),
+    ID_ID(
+        languageTag = "id-ID",
+        nativeName = "Bahasa Indonesia"
     );
 
     fun toLocale(): Locale = Locale.forLanguageTag(languageTag)

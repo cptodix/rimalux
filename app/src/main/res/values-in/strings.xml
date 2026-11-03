@@ -1,0 +1,524 @@
+<resources>
+    <string name="app_name">Rimalux</string>
+
+    <!-- bottom / rail navigation -->
+    <string name="nav_home">Beranda</string>
+    <string name="nav_patterns">Pola</string>
+    <string name="nav_palettes">Warna</string>
+    <string name="nav_auto">Otomatis</string>
+
+
+    <!-- bottom sheet & preview overlays -->
+    <string name="status_loading_wallpaper">Memuat…</string>
+    <string name="cd_bottom_sheet_handle">Pegangan panel pengaturan</string>
+    <string name="label_preview_overlay">Tampilan Pratinjau</string>
+    <string name="overlay_mode_none">Bersih</string>
+    <string name="overlay_mode_lock">Layar Kunci</string>
+    <string name="overlay_mode_icons">Layar Utama</string>
+
+    <!-- realistic phone mockup overlay copy -->
+    <string name="mockup_clock_lock">09:41</string>
+    <string name="mockup_date_short">Sel, 31 Okt</string>
+    <string name="mockup_weather">22°C · Cerah</string>
+    <string name="mockup_search_hint">Cari aplikasi dan web</string>
+    <string name="mockup_notif_1_title">Sinkronisasi Desain</string>
+    <string name="mockup_notif_1_body">10.30 · Ruang Studio</string>
+    <string name="mockup_notif_1_time">2m</string>
+    <string name="mockup_notif_2_title">Alex Rivera</string>
+    <string name="mockup_notif_2_body">Palet OLED barunya terlihat rapi</string>
+    <string name="mockup_notif_2_time">14m</string>
+
+    <string name="mockup_app_calendar">Kalender</string>
+    <string name="mockup_app_photos">Foto</string>
+    <string name="mockup_app_maps">Peta</string>
+    <string name="mockup_app_clock">Jam</string>
+    <string name="mockup_app_mail">Email</string>
+    <string name="mockup_app_music">Musik</string>
+    <string name="mockup_app_files">File</string>
+    <string name="mockup_app_settings">Setelan</string>
+    <string name="mockup_app_phone">Telepon</string>
+    <string name="mockup_app_messages">Pesan</string>
+    <string name="mockup_app_browser">Browser</string>
+    <string name="mockup_app_camera">Kamera</string>
+
+    <!-- minimalist studio gesture tutorial & top mini hints -->
+    <string name="tutorial_title">Gestur Studio</string>
+    <string name="tutorial_swipe_horiz_title">Geser ke Kiri atau Kanan</string>
+    <string name="tutorial_swipe_horiz_desc">Lihat wallpaper berikutnya atau sebelumnya</string>
+    <string name="tutorial_double_tap_title">Ketuk Dua Kali</string>
+    <string name="tutorial_double_tap_desc">Terapkan, simpan, atau bagikan wallpaper</string>
+    <string name="tutorial_swipe_up_title">Geser ke Atas</string>
+    <string name="tutorial_swipe_up_desc">Atur pola, warna, dan rasio</string>
+    <string name="tutorial_swipe_down_title">Geser ke Bawah</string>
+    <string name="tutorial_swipe_down_desc">Ganti pratinjau layar kunci dan utama</string>
+    <string name="btn_dismiss_tutorial">Mengerti</string>
+    <string name="cd_dismiss_tutorial">Tutup petunjuk gestur</string>
+    <string name="cd_open_gesture_hints">Lihat petunjuk gestur</string>
+
+    <!-- playful mini-hint variations (<question/message> <CTA>) -->
+    <string name="mini_hint_swipe_left_1">Ingin lihat yang berikutnya? Coba geser kiri</string>
+    <string name="mini_hint_swipe_left_2">Siap mencoba pola baru? Geser kiri</string>
+    <string name="mini_hint_swipe_left_3">Penasaran tampilan selanjutnya? Coba geser kiri</string>
+    <string name="mini_hint_swipe_left_4">Kurang cocok yang ini? Geser kiri untuk lanjut</string>
+
+    <string name="mini_hint_swipe_right_1">Kelewatan yang bagus tadi? Coba geser kanan</string>
+    <string name="mini_hint_swipe_right_2">Ingin kembali ke tampilan tadi? Geser kanan</string>
+    <string name="mini_hint_swipe_right_3">Melewati favoritmu? Coba geser kanan</string>
+    <string name="mini_hint_swipe_right_4">Berubah pikiran? Geser kanan untuk kembali</string>
+
+    <string name="mini_hint_double_tap_1">Sudah ketemu yang pas? Ketuk dua kali</string>
+    <string name="mini_hint_double_tap_2">Suka wallpaper ini? Coba ketuk dua kali</string>
+    <string name="mini_hint_double_tap_3">Siap dipasang di layar? Ketuk layar dua kali</string>
+    <string name="mini_hint_double_tap_4">Ingin simpan atau pasang ini? Ketuk dua kali</string>
+
+    <string name="mini_hint_swipe_up_1">Ingin atur warna atau pola? Geser atas</string>
+    <string name="mini_hint_swipe_up_2">Ingin berkreasi sendiri? Geser atas untuk atur</string>
+    <string name="mini_hint_swipe_up_3">Ubah Rasio Hitam Pekat? Geser atas</string>
+    <string name="mini_hint_swipe_up_4">Ingin racikan sendiri? Coba geser atas</string>
+
+    <string name="mini_hint_swipe_down_1">Penasaran tampilan ikon di sini? Geser bawah</string>
+    <string name="mini_hint_swipe_down_2">Cek di Layar Kunci atau Utama? Geser bawah</string>
+    <string name="mini_hint_swipe_down_3">Cek keterbacaan jam dan aplikasi? Geser bawah</string>
+    <string name="mini_hint_swipe_down_4">Ingin pratinjau layar ponsel? Geser bawah</string>
+
+    <!-- home screen -->
+    <string name="label_pitch_black_ratio">Rasio Hitam Pekat</string>
+    <string name="black_mode_single">Nilai Tunggal</string>
+    <string name="black_mode_range">Rentang</string>
+    <string name="pitch_black_range_value">%1$d%% – %2$d%%</string>
+    <string name="pitch_black_active_now">Kini %1$d%%</string>
+    <string name="preview_pending_changes_notice">Setelan diperbarui · Geser kiri untuk berikutnya</string>
+    <string name="preview_true_black_percent">%1$d%% Hitam Pekat</string>
+
+    <string name="summary_patterns_random">Acak (%1$d)</string>
+    <string name="summary_patterns_selected">%1$s</string>
+    <string name="weight_short_normal">Normal</string>
+    <string name="weight_short_center">Terpusat</string>
+    <string name="summary_palette_random">Diacak</string>
+    <string name="summary_palette_single">%1$s</string>
+    <string name="summary_palette_list">%1$d Palet</string>
+    <string name="fill_short_solid">Solid</string>
+    <string name="fill_short_gradient">Gradien</string>
+
+    <string name="target_home">Layar Utama</string>
+    <string name="target_lock">Layar Kunci</string>
+    <string name="target_both">Keduanya</string>
+    <string name="target_both_separate">Keduanya Terpisah</string>
+    <string name="dialog_set_wallpaper_title">Terapkan Wallpaper ke</string>
+    <string name="btn_save_to_device">Simpan ke Perangkat</string>
+    <string name="btn_share_wallpaper">Bagikan</string>
+    <string name="share_chooser_title">Bagikan Wallpaper</string>
+    <string name="share_wallpaper_subject">Rimalux · %1$s</string>
+    <string name="share_watermark_text">Dibuat secara prosedural oleh Rimalux · %1$s</string>
+
+    <string name="btn_back">Kembali</string>
+    <string name="cd_navigate_back">Kembali ke layar sebelumnya</string>
+
+    <!-- patterns screen (80 procedural math patterns) -->
+    <string name="patterns_title">Pola</string>
+    <string name="patterns_subtitle">Acak dari seluruh %1$d pola prosedural atau pilih favoritmu.</string>
+    <string name="label_pattern_layout">Tata Letak Pola</string>
+    <string name="weight_mode_normal">Normal</string>
+    <string name="weight_mode_center">Terpusat</string>
+    <string name="mode_randomized">Acak Semua</string>
+    <string name="mode_multiselect">Pilih Kustom</string>
+    <string name="patterns_multiselect_hint">Pilih pola kustom untuk pembuatan (%1$d dari %2$d dipilih)</string>
+
+    <string name="cat_all">Semua (%1$d)</string>
+    <string name="cat_flow">Aliran &amp; Gelombang</string>
+    <string name="cat_symmetry">Simetri &amp; Sakral</string>
+    <string name="cat_architectural">Arsitektural</string>
+    <string name="cat_tessellation">Teselasi</string>
+
+    <!-- original 16 patterns -->
+    <string name="pattern_silk_ribbons">Pita Aliran Sutra</string>
+    <string name="pattern_silk_ribbons_sub">Garis arus medan curl diferensial</string>
+    <string name="pattern_crystal_voronoi">Faset Kristal</string>
+    <string name="pattern_crystal_voronoi_sub">Pecahan permata Delaunay berfaset</string>
+    <string name="pattern_sacred_mandala">Mandala Sakral</string>
+    <string name="pattern_sacred_mandala_sub">Harmonik mawar polar &amp; lengkung teratai</string>
+    <string name="pattern_topo_contours">Kontur Topografi</string>
+    <string name="pattern_topo_contours_sub">Garis kontur elevasi multi-oktaf</string>
+    <string name="pattern_guilloche_rosette">Spiro Guilloché</string>
+    <string name="pattern_guilloche_rosette_sub">Filigri moiré hipotrokoid</string>
+    <string name="pattern_isometric_monument">Prisma Isometrik</string>
+    <string name="pattern_isometric_monument_sub">Blok berundak arsitektural 30°</string>
+    <string name="pattern_bauhaus_construct">Konstruksi Bauhaus</string>
+    <string name="pattern_bauhaus_construct_sub">Busur rasio emas &amp; kisi halus</string>
+    <string name="pattern_art_deco_sunburst">Pancaran Art Deco</string>
+    <string name="pattern_art_deco_sunburst_sub">Lengkung kipas memancar &amp; menara</string>
+    <string name="pattern_origami_miura">Origami Miura</string>
+    <string name="pattern_origami_miura_sub">Lipatan tulang ikan berlipit</string>
+    <string name="pattern_penrose_quasicrystal">Teselasi Penrose</string>
+    <string name="pattern_penrose_quasicrystal_sub">Kuasikristal segitiga-φ aperiodik</string>
+    <string name="pattern_fibonacci_lotus">Spiral Fibonacci</string>
+    <string name="pattern_fibonacci_lotus_sub">Pusaran kelopak sudut emas 137,5°</string>
+    <string name="pattern_harmonic_cardioid">Kardioid Harmonik</string>
+    <string name="pattern_harmonic_cardioid_sub">Jaring tali busur modular &amp; nefroid</string>
+    <string name="pattern_fractal_lattice">Anyaman Fraktal</string>
+    <string name="pattern_fractal_lattice_sub">Subdivisi barisentrik rekursif</string>
+    <string name="pattern_op_art_gravity">Gravitasi Op-Art</string>
+    <string name="pattern_op_art_gravity_sub">Pita kinetik lengkung lensa</string>
+    <string name="pattern_girih_starwork">Bintang Girih</string>
+    <string name="pattern_girih_starwork_sub">Roset bintang jalinan 12-lipat</string>
+    <string name="pattern_horizon_waves">Strata Cakrawala</string>
+    <string name="pattern_horizon_waves_sub">Punggung bukit harmonik berlapis &amp; gerhana</string>
+
+    <!-- patterns #17 - #32 -->
+    <string name="pattern_lissajous_harmonic">Harmonik Lissajous</string>
+    <string name="pattern_lissajous_harmonic_sub">Pita gelombang orbital terkunci fase</string>
+    <string name="pattern_logarithmic_nautilus">Nautilus Emas</string>
+    <string name="pattern_logarithmic_nautilus_sub">Sekat bilik spiral ekuiangular</string>
+    <string name="pattern_chladni_cymatics">Simatik Chladni</string>
+    <string name="pattern_chladni_cymatics_sub">Sel nodal gelombang tegak akustik</string>
+    <string name="pattern_moire_interference">Interferensi Moiré</string>
+    <string name="pattern_moire_interference_sub">Resonansi cincin gelombang dwi-fokus</string>
+    <string name="pattern_magnetic_dipole">Fluks Magnetik</string>
+    <string name="pattern_magnetic_dipole_sub">Garis arus medan vektor bipolar</string>
+    <string name="pattern_aurora_curtains">Tirai Borealis</string>
+    <string name="pattern_aurora_curtains_sub">Tirai langit harmonik vertikal</string>
+    <string name="pattern_apollonian_circles">Cincin Apollonian</string>
+    <string name="pattern_apollonian_circles_sub">Susunan lingkaran singgung &amp; sabit</string>
+    <string name="pattern_shattered_geode">Geode Akik</string>
+    <string name="pattern_shattered_geode_sub">Lapisan cincin mineral kristalin</string>
+    <string name="pattern_voronoi_stained_glass">Kaca Patri Katedral</string>
+    <string name="pattern_voronoi_stained_glass_sub">Permata poligonal kaca Voronoi</string>
+    <string name="pattern_hex_honeycomb_prism">Matriks Heksagonal</string>
+    <string name="pattern_hex_honeycomb_prism_sub">Sel prisma belah ketupat 6-lipat bersarang</string>
+    <string name="pattern_truchet_labyrinth">Labirin Truchet</string>
+    <string name="pattern_truchet_labyrinth_sub">Jalur pita busur seperempat menyatu</string>
+    <string name="pattern_superellipse_nest">Superelips Lamé</string>
+    <string name="pattern_superellipse_nest_sub">Cincin squircle Piet Hein berpilin</string>
+    <string name="pattern_kaleidoscope_prism">Kaleidoskop Cermin</string>
+    <string name="pattern_kaleidoscope_prism_sub">Faset pecahan simetris dihedral</string>
+    <string name="pattern_hyperbolic_poincare">Geodesik Poincaré</string>
+    <string name="pattern_hyperbolic_poincare_sub">Busur ortogonal cakram hiperbolik</string>
+    <string name="pattern_celtic_interlace">Kisi Kepang</string>
+    <string name="pattern_celtic_interlace_sub">Anyaman pita diagonal silang</string>
+    <string name="pattern_kumiko_woodwork">Kumiko Asanoha</string>
+    <string name="pattern_kumiko_woodwork_sub">Sambungan kayu daun rami Jepang 6-lipat</string>
+
+    <!-- patterns #33 - #48 -->
+    <string name="pattern_lorenz_attractor">Kupu-Kupu Lorenz</string>
+    <string name="pattern_lorenz_attractor_sub">Sayap fase atraktor asing kaotik</string>
+    <string name="pattern_fourier_epicycles">Episiklus Fourier</string>
+    <string name="pattern_fourier_epicycles_sub">Pita orbital fasor harmonik</string>
+    <string name="pattern_kelvin_vortex">Jalur Pusaran</string>
+    <string name="pattern_kelvin_vortex_sub">Pusaran fluida Kármán berlawanan arah</string>
+    <string name="pattern_caustic_water">Kaustik Laguna</string>
+    <string name="pattern_caustic_water_sub">Sel cahaya bias selubung gelombang</string>
+    <string name="pattern_maurer_rose">Mawar Maurer</string>
+    <string name="pattern_maurer_rose_sub">Kelopak mawar tali busur polar modular</string>
+    <string name="pattern_superformula_bloom">Morfogen Gielis</string>
+    <string name="pattern_superformula_bloom_sub">Cangkang bintang superformula tergeneralisasi</string>
+    <string name="pattern_fermat_parabolic">Parastiki Fermat</string>
+    <string name="pattern_fermat_parabolic_sub">Spiral bunga matahari putar balik</string>
+    <string name="pattern_metatron_polyhedra">Bintang Metatron</string>
+    <string name="pattern_metatron_polyhedra_sub">Kisi polihedral sakral 13-simpul</string>
+    <string name="pattern_geodesic_dome">Kubah Geodesik</string>
+    <string name="pattern_geodesic_dome_sub">Faset rangka bola ter-triangulasi</string>
+    <string name="pattern_perspective_colonnade">Atrium Tak Terhingga</string>
+    <string name="pattern_perspective_colonnade_sub">Portal kaset titik hilang perspektif</string>
+    <string name="pattern_de_stijl_mondrian">Kisi Neoplastik</string>
+    <string name="pattern_de_stijl_mondrian_sub">Bidang warna ortogonal rasio emas</string>
+    <string name="pattern_brutalist_ziggurat">Ziggurat Berundak</string>
+    <string name="pattern_brutalist_ziggurat_sub">Teras kantilever berfaset bayangan</string>
+    <string name="pattern_hilbert_fractal">Labirin Hilbert</string>
+    <string name="pattern_hilbert_fractal_sub">Jalur fraktal kontinu pengisi ruang</string>
+    <string name="pattern_dragon_curve">Naga Heighway</string>
+    <string name="pattern_dragon_curve_sub">Mosaik lipatan 90° serupa-diri</string>
+    <string name="pattern_cairo_pentagonal">Pentagon Kairo</string>
+    <string name="pattern_cairo_pentagonal_sub">Jaring ubin jalan berselang 4-lipat</string>
+    <string name="pattern_kagome_trihexagonal">Kisi Kagome</string>
+    <string name="pattern_kagome_trihexagonal_sub">Anyaman bintang triheksagonal</string>
+
+    <!-- patterns #49 - #64 -->
+    <string name="pattern_thomas_attractor">Labirin Thomas</string>
+    <string name="pattern_thomas_attractor_sub">Kepang fase 3D simetris siklik</string>
+    <string name="pattern_airy_wavefront">Difraksi Airy</string>
+    <string name="pattern_airy_wavefront_sub">Rumbai muka gelombang katastropi parabolik</string>
+    <string name="pattern_rossler_spiral">Pusaran Rössler</string>
+    <string name="pattern_rossler_spiral_sub">Pita kaotik terlipat &amp; simpul pelana</string>
+    <string name="pattern_cassini_lemniscate">Oval Cassini</string>
+    <string name="pattern_cassini_lemniscate_sub">Lemniskat hasil-kali konstan bipolar</string>
+    <string name="pattern_deltoid_astroid">Puncak Astroid</string>
+    <string name="pattern_deltoid_astroid_sub">Selubung bintang &amp; titik balik hiposikloid</string>
+    <string name="pattern_zellij_khatam">Zellij Khatam</string>
+    <string name="pattern_zellij_khatam_sub">Roset bintang Maroko 16-lipat</string>
+    <string name="pattern_vesica_lenses">Vesica Piscis</string>
+    <string name="pattern_vesica_lenses_sub">Matriks kelopak lensa sakral bertumpuk</string>
+    <string name="pattern_triskelion_spirals">Spiral Triskelion</string>
+    <string name="pattern_triskelion_spirals_sub">Bilah spiral multi-lengan putar silang</string>
+    <string name="pattern_escher_staircases">Tangga Escher</string>
+    <string name="pattern_escher_staircases_sub">Anak tangga berundak aksonometrik</string>
+    <string name="pattern_kinetic_facade">Fasad Kinetik</string>
+    <string name="pattern_kinetic_facade_sub">Sirip peneduh parametrik berpilin</string>
+    <string name="pattern_pantheon_oculus">Kaset Pantheon</string>
+    <string name="pattern_pantheon_oculus_sub">Relung kubah radial &amp; okulus</string>
+    <string name="pattern_suprematist_planes">Bidang Suprematis</string>
+    <string name="pattern_suprematist_planes_sub">Vektor konstruktivis kantilever</string>
+    <string name="pattern_sierpinski_prism">Prisma Sierpiński</string>
+    <string name="pattern_sierpinski_prism_sub">Faset segitiga rekursif berongga</string>
+    <string name="pattern_archimedean_snub">Snub Archimedean</string>
+    <string name="pattern_archimedean_snub_sub">Jaring semi-reguler persegi-segitiga kiral</string>
+    <string name="pattern_ammann_quasicrystal">Kuasikristal Ammann</string>
+    <string name="pattern_ammann_quasicrystal_sub">Belah ketupat &amp; persegi rasio perak 8-lipat</string>
+    <string name="pattern_pythagoras_canopy">Fraktal Pythagoras</string>
+    <string name="pattern_pythagoras_canopy_sub">Kanopi persegi segitiga siku-siku rekursif</string>
+
+    <!-- patterns #65 - #80 -->
+    <string name="pattern_clifford_attractor">Atraktor Clifford</string>
+    <string name="pattern_clifford_attractor_sub">Tirai fase trigonometri berulang</string>
+    <string name="pattern_faraday_ripples">Gelombang Faraday</string>
+    <string name="pattern_faraday_ripples_sub">Kisi gelombang kapiler parametrik</string>
+    <string name="pattern_bernoulli_spirals">Spira Mirabilis</string>
+    <string name="pattern_bernoulli_spirals_sub">Sepasang lengan ekuiangular berlawanan arah</string>
+    <string name="pattern_soliton_trains">Soliton KdV</string>
+    <string name="pattern_soliton_trains_sub">Pulsa gelombang sech² nonlinier berinteraksi</string>
+    <string name="pattern_enneagram_star">Roset Enneagram</string>
+    <string name="pattern_enneagram_star_sub">Mandala tali busur &amp; kelopak 9-lipat</string>
+    <string name="pattern_rhodonea_bloom">Kurva Rhodonea</string>
+    <string name="pattern_rhodonea_bloom_sub">Kelopak polar Grandi harmonik</string>
+    <string name="pattern_epitrochoid_crown">Mahkota Epitrochoid</string>
+    <string name="pattern_epitrochoid_crown_sub">Simpul &amp; puncak orbit planet menggelinding</string>
+    <string name="pattern_sri_yantra_triangles">Jalinan Yantra</string>
+    <string name="pattern_sri_yantra_triangles_sub">Segitiga sakral saling mengunci &amp; teratai</string>
+    <string name="pattern_calatrava_ribs">Parabola Kubah</string>
+    <string name="pattern_calatrava_ribs_sub">Barisan lengkung rusuk parabolik</string>
+    <string name="pattern_hexagonal_basalt">Kolom Basal</string>
+    <string name="pattern_hexagonal_basalt_sub">Pilar heksagonal berundak aksonometrik</string>
+    <string name="pattern_metabolist_capsules">Menara Kapsul</string>
+    <string name="pattern_metabolist_capsules_sub">Pod okulus kantilever modular</string>
+    <string name="pattern_diagrid_skyscraper">Atrium Diagrid</string>
+    <string name="pattern_diagrid_skyscraper_sub">Rangka luar berlian struktural meruncing</string>
+    <string name="pattern_laves_floret">Pentagon Floret</string>
+    <string name="pattern_laves_floret_sub">Roset pentagonal Laves kiral 6-lipat</string>
+    <string name="pattern_kite_dart_star">Bintang Dekagonal</string>
+    <string name="pattern_kite_dart_star_sub">Teselasi layang-layang &amp; panah emas 5-lipat</string>
+    <string name="pattern_triangular_gyroid">Faset Segitiga</string>
+    <string name="pattern_triangular_gyroid_sub">Kisi sudut kubus isometrik 3-arah</string>
+    <string name="pattern_gosper_flowsnake">Pulau Gosper</string>
+    <string name="pattern_gosper_flowsnake_sub">Ubin heksagonal Peano-Gosper rekursif</string>
+
+    <!-- palettes screen & solid/gradient option -->
+    <string name="palettes_title">Warna</string>
+    <string name="palettes_subtitle">Pilih palet warna aktif untuk pembuatan wallpaper.</string>
+    <string name="label_color_shading">Gaya Isi Warna</string>
+    <string name="fill_mode_solid">Warna Solid</string>
+    <string name="fill_mode_gradient">Gradien</string>
+    <string name="palette_mode_random">Acak Semua</string>
+    <string name="palette_mode_list">Pilih Kustom</string>
+    <string name="random_palette_card_title">Harmoni Warna Acak</string>
+    <string name="random_palette_card_desc">Menghasilkan harmoni warna kontras tinggi yang seimbang di setiap wallpaper baru.</string>
+    <string name="btn_shuffle_colors">Acak Warna</string>
+    <string name="btn_save_random_to_list">Simpan ke Daftar Saya</string>
+    <string name="btn_select_all">Pilih Semua</string>
+    <string name="btn_select_none">Kosongkan Pilihan</string>
+    <string name="btn_generate_random_harmony">Buat Harmoni Acak</string>
+
+    <string name="palette_list_hint">Pilih palet kustom untuk pembuatan (%1$d dari %2$d aktif)</string>
+    <string name="btn_add_palette">Tambah Palet</string>
+    <string name="btn_remove_palette">Hapus</string>
+    <string name="cd_delete_palette">Hapus palet dari daftar</string>
+
+    <!-- create palette sheet -->
+    <string name="sheet_create_palette_title">Palet Baru</string>
+    <string name="label_palette_name">Nama Palet</string>
+    <string name="placeholder_palette_name">mis. Senja Neon</string>
+    <string name="label_palette_swatches">Warna (%1$d / 6)</string>
+    <string name="btn_add_swatch">Tambah Warna</string>
+    <string name="btn_remove_swatch">Hapus Warna</string>
+    <string name="cd_select_swatch">Pilih warna %1$d</string>
+    <string name="label_hex_code">Hex</string>
+    <string name="label_hue">Rona (Hue)</string>
+    <string name="label_saturation">Saturasi</string>
+    <string name="label_brightness">Kecerahan</string>
+    <string name="btn_save_palette">Tambahkan ke Daftar</string>
+    <string name="btn_cancel">Batal</string>
+
+    <!-- auto interval screen -->
+    <string name="auto_title">Interval Otomatis</string>
+    <string name="auto_subtitle">Berjalan andal di latar belakang meskipun aplikasi ditutup</string>
+    <string name="auto_master_toggle">Ganti Wallpaper Otomatis</string>
+    <string name="auto_off_desc">Memperbarui wallpaper secara otomatis sesuai interval waktu</string>
+    <string name="label_auto_target">Terapkan ke</string>
+    <string name="label_interval">Interval</string>
+    <string name="btn_custom_interval">Kustom…</string>
+    <string name="btn_custom_interval_active">Kustom · %1$s</string>
+    <string name="dialog_custom_interval_title">Interval Kustom (Menit)</string>
+    <string name="label_minutes_input">Menit (1 – 10.080)</string>
+    <string name="error_interval_range">Masukkan 1 hingga 10.080 menit</string>
+    <string name="btn_confirm_interval">Simpan</string>
+    <string name="btn_auto_change_troubleshoot">Ganti otomatis berhenti bekerja?</string>
+
+    <!-- auto-change troubleshooting help screen -->
+    <string name="auto_help_title">Bantuan Ganti Otomatis</string>
+    <string name="auto_help_why_title">Mengapa Ganti Otomatis Berhenti</string>
+    <string name="auto_help_why_body">Banyak merek ponsel memiliki penghemat baterai agresif yang menghentikan paksa aplikasi latar belakang saat layar mati. Mengatur Rimalux ke Tidak Dibatasi membuat ganti otomatis berjalan lancar dengan konsumsi baterai nyaris nol.</string>
+
+    <string name="auto_help_vendor_section_title">Panduan Sesuai Merek</string>
+    <string name="auto_help_vendor_detected_sub">Perangkat terdeteksi: %1$s</string>
+    <string name="auto_help_not_your_device">Bukan perangkatmu?</string>
+    <string name="dialog_select_brand_title">Pilih Merek</string>
+    <string name="auto_help_badge_your_device">Ponselmu</string>
+    <string name="auto_help_open_vendor_shortcut">Buka Setelan Latar Belakang %1$s</string>
+    <string name="btn_open_app_battery_info">Buka Info Aplikasi</string>
+
+    <!-- Vendor names & OS skins -->
+    <string name="vendor_xiaomi_name">Xiaomi / POCO</string>
+    <string name="vendor_xiaomi_full">Xiaomi · Redmi · POCO</string>
+    <string name="vendor_xiaomi_skin">HyperOS &amp; MIUI</string>
+    <string name="vendor_xiaomi_step_1">Buka Info Aplikasi Rimalux dan aktifkan Mulai otomatis (Autostart).</string>
+    <string name="vendor_xiaomi_step_2">Ketuk Penghemat baterai (atau Baterai) lalu pilih Tanpa pembatasan (No restrictions).</string>
+    <string name="vendor_xiaomi_step_3">Buka Aplikasi Terkini (Recent Apps), tekan dan tahan kartu Rimalux (atau ketuk menu), lalu ketuk ikon Gembok agar tidak terhapus saat membersihkan memori.</string>
+
+    <string name="vendor_samsung_name">Samsung</string>
+    <string name="vendor_samsung_full">Samsung Galaxy</string>
+    <string name="vendor_samsung_skin">One UI</string>
+    <string name="vendor_samsung_step_1">Buka Info Aplikasi Rimalux, ketuk Baterai, lalu pilih Tidak dibatasi (Unrestricted).</string>
+    <string name="vendor_samsung_step_2">Buka Pengaturan → Baterai → Batas penggunaan latar belakang, lalu hapus Rimalux dari Aplikasi tidur dan Aplikasi tidur pulas.</string>
+    <string name="vendor_samsung_step_3">Di Batas penggunaan latar belakang, ketuk Aplikasi tidak pernah tidur otomatis → + lalu tambahkan Rimalux.</string>
+
+    <string name="vendor_oppo_name">OPPO / OnePlus</string>
+    <string name="vendor_oppo_full">OPPO · Realme · OnePlus</string>
+    <string name="vendor_oppo_skin">ColorOS, Realme UI &amp; OxygenOS</string>
+    <string name="vendor_oppo_step_1">Buka Info Aplikasi Rimalux → Penggunaan baterai (atau Baterai), lalu aktifkan Izinkan aktivitas latar belakang dan Izinkan peluncuran otomatis.</string>
+    <string name="vendor_oppo_step_2">Jika muncul opsi Optimalkan penggunaan baterai, atur Rimalux ke Jangan optimalkan / Tidak dibatasi.</string>
+    <string name="vendor_oppo_step_3">Di Aplikasi Terkini (Recent Apps), ketuk menu tiga titik di atas Rimalux lalu pilih Kunci (Lock).</string>
+
+    <string name="vendor_vivo_name">Vivo / iQOO</string>
+    <string name="vendor_vivo_full">Vivo · iQOO</string>
+    <string name="vendor_vivo_skin">Funtouch OS &amp; OriginOS</string>
+    <string name="vendor_vivo_step_1">Buka Info Aplikasi Rimalux → Baterai, lalu pilih Tidak dibatasi (atau aktifkan Konsumsi daya latar belakang tinggi).</string>
+    <string name="vendor_vivo_step_2">Buka Pengaturan → Aplikasi → Mulai otomatis (atau iManager → Manajer aplikasi → Manajer mulai otomatis) dan aktifkan Rimalux.</string>
+    <string name="vendor_vivo_step_3">Di Aplikasi Terkini (Recent Apps), ketuk panah di samping Rimalux lalu pilih Kunci (Lockdown / Lock).</string>
+
+    <string name="vendor_huawei_name">Huawei / Honor</string>
+    <string name="vendor_huawei_full">Huawei · Honor</string>
+    <string name="vendor_huawei_skin">EMUI &amp; MagicOS</string>
+    <string name="vendor_huawei_step_1">Buka Pengaturan → Baterai → Peluncuran aplikasi, cari Rimalux, lalu matikan Kelola secara otomatis.</string>
+    <string name="vendor_huawei_step_2">Pada jendela manual yang muncul, biarkan Peluncuran otomatis, Peluncuran sekunder, dan Jalankan di latar belakang tetap aktif, lalu ketuk OK.</string>
+    <string name="vendor_huawei_step_3">Di Aplikasi Terkini (Recent Apps), tarik kartu Rimalux ke bawah hingga ikon gembok muncul.</string>
+
+    <string name="vendor_asus_name">ASUS</string>
+    <string name="vendor_asus_full">ASUS Zenfone &amp; ROG</string>
+    <string name="vendor_asus_skin">ZenUI &amp; ROG UI</string>
+    <string name="vendor_asus_step_1">Buka Mobile Manager → PowerMaster → Auto-start Manager lalu ubah Rimalux menjadi Izinkan (Allow).</string>
+    <string name="vendor_asus_step_2">Buka Info Aplikasi Rimalux → Baterai lalu pilih Tidak dibatasi (Unrestricted).</string>
+    <string name="vendor_asus_step_3">Jika Mode Sistem / Mode hemat ultra aktif di Armoury Crate atau Baterai, kecualikan Rimalux dari pembersihan latar belakang.</string>
+
+    <string name="vendor_stock_name">Pixel / Standar</string>
+    <string name="vendor_stock_full">Google Pixel · Motorola · Nothing · Sony</string>
+    <string name="vendor_stock_skin">Android Standar</string>
+    <string name="vendor_stock_step_1">Buka Info Aplikasi Rimalux → Penggunaan baterai aplikasi.</string>
+    <string name="vendor_stock_step_2">Aktifkan Izinkan penggunaan latar belakang, lalu ketuk baris teks Izinkan penggunaan latar belakang (bukan hanya sakelarnya) dan pilih Tidak dibatasi.</string>
+    <string name="vendor_stock_step_3">Hindari menekan Paksa berhenti (Force stop) di Info Aplikasi, karena Android membatalkan semua jadwal aplikasi yang dihentikan paksa hingga aplikasi dibuka kembali.</string>
+
+    <string name="auto_help_tip_title">Tips Pemulihan Cepat</string>
+    <string name="auto_help_tip_body">Jika ganti otomatis sempat berhenti, cukup buka Rimalux sekali saja untuk melanjutkan jadwal ganti otomatis.</string>
+
+    <!-- feedback -->
+    <string name="msg_wallpaper_applied">Diterapkan ke %1$s · %2$d%% hitam pekat</string>
+    <string name="msg_wallpaper_error">Gagal memasang wallpaper: %1$s</string>
+    <string name="msg_wallpaper_saved">Disimpan ke Gambar · %1$d×%2$d PNG</string>
+    <string name="msg_wallpaper_save_error">Gagal menyimpan wallpaper: %1$s</string>
+    <string name="msg_wallpaper_share_error">Gagal membagikan wallpaper: %1$s</string>
+    <string name="msg_storage_permission_denied">Izin penyimpanan diperlukan untuk menyimpan wallpaper</string>
+    <string name="msg_palette_saved">Menambahkan \"%1$s\" ke daftar palet</string>
+    <string name="msg_schedule_updated">Ganti otomatis setiap %1$s (%2$s)</string>
+    <string name="msg_vendor_fallback_app_info">Info Aplikasi dibuka — ketuk Baterai untuk memilih Tidak dibatasi</string>
+    <string name="msg_settings_open_error">Tidak dapat membuka setelan sistem di perangkat ini</string>
+
+    <!-- Enjoying Rimalux & Send Thanks (Voluntary Tip Jar) -->
+    <string name="btn_like_the_app">Suka Rimalux?</string>
+    <string name="dialog_like_app_title">Suka Rimalux?</string>
+    <string name="dialog_like_app_sub">Rimalux 100% gratis tanpa iklan atau pelacakan. Jika aplikasi ini mempercantik tampilan layar ponselmu, ulasan atau sedikit apresiasi akan sangat berarti.</string>
+    <string name="btn_rate_app">Beri Ulasan</string>
+    <string name="btn_send_thanks">Kirim Apresiasi</string>
+
+    <string name="dialog_send_thanks_title">Kirim Apresiasi</string>
+    <string name="dialog_send_thanks_sub">Tanpa fitur terkunci, tanpa imbalan khusus, dan tanpa janji muluk—hanya kotak tip sederhana jika kamu ingin menyampaikan terima kasih.</string>
+    <string name="tip_1_usd">$1</string>
+    <string name="tip_3_usd">$3</string>
+    <string name="tip_5_usd">$5</string>
+    <string name="tip_10_usd">$10</string>
+    <string name="tip_20_usd">$20</string>
+    <string name="msg_rating_launched">Membuka Play Store untuk memberi ulasan…</string>
+    <string name="msg_thanks_sent">Terima kasih banyak atas apresiasi %1$s! Dukunganmu sangat berarti.</string>
+    <string name="msg_tip_pending">Apresiasi %1$s sedang menunggu konfirmasi pembayaran di Google Play.</string>
+    <string name="msg_tip_unavailable">Pilihan apresiasi ini belum aktif di Google Play.</string>
+    <string name="msg_tip_billing_unavailable">Layanan pembayaran Google Play tidak tersedia di perangkat ini.</string>
+    <string name="msg_tip_error">Tidak dapat menyelesaikan pembayaran apresiasi: %1$s</string>
+    <string name="about_sheet_footer">Rimalux v%1$s oleh Cptodix Studio @%2$d</string>
+
+    <!-- Language selector & localization formatters -->
+    <string name="label_language">Bahasa</string>
+    <string name="dialog_language_title">Bahasa</string>
+    <string name="language_selector_summary">%1$s · %2$s</string>
+    <string name="summary_patterns_selected_more">%1$s +%2$d</string>
+    <string name="format_percent_int">%1$d%%</string>
+    <string name="format_degrees_int">%1$d°</string>
+    <string name="default_harmony_palette_name">Harmoni #%1$d</string>
+    <string name="default_custom_palette_name">Palet #%1$d</string>
+
+    <!-- Localized schedule interval units & plurals -->
+    <string name="interval_short_minutes">%1$dm</string>
+    <string name="interval_short_hours">%1$dj</string>
+    <string name="interval_short_days">%1$dh</string>
+    <string name="interval_short_hours_minutes">%1$dj %2$dm</string>
+    <plurals name="interval_desc_minutes">
+        <item quantity="one">%1$d Menit</item>
+        <item quantity="other">%1$d Menit</item>
+    </plurals>
+    <plurals name="interval_desc_hours">
+        <item quantity="one">%1$d Jam</item>
+        <item quantity="other">%1$d Jam</item>
+    </plurals>
+    <plurals name="interval_desc_days">
+        <item quantity="one">%1$d Hari</item>
+        <item quantity="other">%1$d Hari</item>
+    </plurals>
+
+    <!-- Built-in curated starter palette names (41 palettes) -->
+    <string name="palette_name_obsidian_aurora">Sutra Aurora</string>
+    <string name="palette_name_monochromatic_oled">Monokromatik</string>
+    <string name="palette_name_imperial_gold">Emas Imperial</string>
+    <string name="palette_name_bauhaus_studio">Bauhaus Modern</string>
+    <string name="palette_name_nordic_glacier">Gletser Nordik</string>
+    <string name="palette_name_titanium_mono">Sutra Perak</string>
+    <string name="palette_name_cyberpunk_shibuya">Cyberpunk Shibuya</string>
+    <string name="palette_name_kyoto_autumn">Maple Kyoto</string>
+    <string name="palette_name_synthwave_sunset">Senja Synthwave</string>
+    <string name="palette_name_emerald_peacock">Merak Zamrud</string>
+    <string name="palette_name_solar_flare">Suar Surya</string>
+    <string name="palette_name_bioluminescent_reef">Bioluminesensi Karang</string>
+    <string name="palette_name_royal_amethyst">Kecubung Ningrat</string>
+    <string name="palette_name_matcha_botanical">Studio Matcha</string>
+    <string name="palette_name_sahara_terracotta">Terakota Sahara</string>
+    <string name="palette_name_tokyo_neon_mint">Mint Neon</string>
+    <string name="palette_name_copper_patina">Patina Tembaga</string>
+    <string name="palette_name_cosmic_nebula">Nebula Kosmik</string>
+    <string name="palette_name_pastel_macaron">Sutra Pastel</string>
+    <string name="palette_name_crimson_samurai">Pernis Merah Tua</string>
+    <string name="palette_name_oceanic_abyss">Puncak Pasifik</string>
+    <string name="palette_name_electric_citrus">Sitrus Elektrik</string>
+    <string name="palette_name_velvet_rose">Mawar Beludru</string>
+    <string name="palette_name_arctic_prism">Prisma Arktik</string>
+    <string name="palette_name_monochrome_champagne">Kuningan Sampanye</string>
+    <string name="palette_name_sakura_twilight">Senja Sakura</string>
+    <string name="palette_name_amber_phosphor">Fosfor Amber</string>
+    <string name="palette_name_aegean_caldera">Kaldera Aegea</string>
+    <string name="palette_name_ultraviolet_pulse">Denyut Ultraviolet</string>
+    <string name="palette_name_celadon_jade">Giok Seladon</string>
+    <string name="palette_name_andes_alpenglow">Pijar Andes</string>
+    <string name="palette_name_marrakesh_saffron">Saffron Marrakesh</string>
+    <string name="palette_name_venetian_murano">Murano Venesia</string>
+    <string name="palette_name_plasma_prism">Prisma Plasma</string>
+    <string name="palette_name_boreal_fjord">Fyord Boreal</string>
+    <string name="palette_name_gilded_bronze">Perunggu Sepuh</string>
+    <string name="palette_name_miami_mirage">Fatamorgana Miami</string>
+    <string name="palette_name_tropical_orchid">Anggrek Tropis</string>
+    <string name="palette_name_lunar_frost">Embun Beku Bulan</string>
+    <string name="palette_name_obsidian_ember">Bara Obsidian</string>
+    <string name="palette_name_blackfire_opal">Opal Api Hitam</string>
+</resources>
