@@ -16,22 +16,28 @@ import java.util.zip.ZipOutputStream
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+@Ignore("On-demand distribution asset generator; remove @Ignore locally only when regenerating distribution/ media.")
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class GenerateShowcaseWallpapersTest {
 
+    private fun resolveProjectRoot(): File {
+        val cwd = File(".").canonicalFile
+        return if (cwd.name == "app" && cwd.parentFile != null) cwd.parentFile!! else cwd
+    }
+
     @Test
     fun generatePromotionalTrueBlackRatioSeries() {
-        val cwd = File(".").canonicalFile
-        val projectRoot = if (cwd.name == "app" && cwd.parentFile != null) cwd.parentFile!! else cwd
-        val promoDir = File(projectRoot, "promotional_wallpapers").apply {
+        val projectRoot = resolveProjectRoot()
+        val promoDir = File(projectRoot, "distribution/promotional_wallpapers").apply {
             mkdirs()
             listFiles()?.filter { it.isFile && it.name.endsWith(".png") }?.forEach { it.delete() }
         }
@@ -107,9 +113,9 @@ class GenerateShowcaseWallpapersTest {
 
     @Test
     fun generateHdWallpaperJpegsForPlayStoreShowcase() {
-        val outDir = File("build/outputs/showcase_wallpapers").apply { mkdirs() }
-        val publicDir = File("public/showcase_wallpapers").apply { mkdirs() }
-        val artifactDir = File("/.aistudio/artifacts/brain/b476f231-ba4b-4ca3-9c02-cc2ef6b81a16").apply { mkdirs() }
+        val projectRoot = resolveProjectRoot()
+        val showcaseRoot = File(projectRoot, "distribution/showcase_wallpapers").apply { mkdirs() }
+        val patternsDir = File(showcaseRoot, "patterns").apply { mkdirs() }
 
         val patterns = ArtPattern.entries
         assertEquals(80, patterns.size)
@@ -140,39 +146,30 @@ class GenerateShowcaseWallpapersTest {
                 heightPx = height
             )
 
-            val fileName = "${pattern.id}.jpg"
-            val fileBuild = File(outDir, fileName)
-            FileOutputStream(fileBuild).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            val outFile = File(patternsDir, "${pattern.id}.jpg")
+            try {
+                FileOutputStream(outFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                }
+            } finally {
+                bitmap.recycle()
             }
-            bitmap.recycle()
-
-            fileBuild.copyTo(File(publicDir, fileName), overwrite = true)
-            generatedFiles.add(fileBuild)
+            generatedFiles.add(outFile)
         }
 
         assertEquals(80, generatedFiles.size)
 
-        // Package into ZIP files
-        val zipFiles = listOf(
-            File("showcase_wallpapers.zip"),
-            File("public/showcase_wallpapers.zip"),
-            File(artifactDir, "showcase_wallpapers.zip")
-        )
-
-        zipFiles.forEach { zipFile ->
-            zipFile.parentFile?.mkdirs()
-            ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
-                generatedFiles.forEach { imgFile ->
-                    zos.putNextEntry(ZipEntry("showcase_wallpapers/${imgFile.name}"))
-                    imgFile.inputStream().use { input ->
-                        input.copyTo(zos)
-                    }
-                    zos.closeEntry()
+        val zipFile = File(showcaseRoot, "showcase_wallpapers.zip")
+        ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+            generatedFiles.forEach { imgFile ->
+                zos.putNextEntry(ZipEntry("showcase_wallpapers/${imgFile.name}"))
+                imgFile.inputStream().use { input ->
+                    input.copyTo(zos)
                 }
+                zos.closeEntry()
             }
-            assertTrue("Expected zip file ${zipFile.path} created", zipFile.exists() && zipFile.length() > 0)
-            println("Created zip package: ${zipFile.absolutePath} (${zipFile.length() / 1024} KB)")
         }
+        assertTrue("Expected zip file ${zipFile.path} created", zipFile.exists() && zipFile.length() > 0)
+        println("Created zip package: ${zipFile.absolutePath} (${zipFile.length() / 1024} KB)")
     }
 }
