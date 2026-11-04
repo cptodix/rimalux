@@ -1,0 +1,110 @@
+name: Bump Version & Create Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Select version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    name: Increment Version & Tag Repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Increment versionCode and versionName in build.gradle.kts
+        id: bump
+        run: |
+          python3 - << 'EOF'
+          import re
+          import sys
+          import os
+
+          bump_type = "${{ inputs.bump_type }}"
+          gradle_path = "app/build.gradle.kts"
+
+          with open(gradle_path, "r") as f:
+              content = f.read()
+
+          vc_match = re.search(r'versionCode\s*=\s*(\d+)', content)
+          vn_match = re.search(r'versionName\s*=\s*"([^"]+)"', content)
+
+          if not vc_match or not vn_match:
+              print("::error::Could not find versionCode or versionName in app/build.gradle.kts")
+              sys.exit(1)
+
+          old_vc = int(vc_match.group(1))
+          old_vn = vn_match.group(1)
+
+          new_vc = old_vc + 1
+
+          # Parse SemVer (e.g., 1.0.0 -> [1, 0, 0])
+          clean_vn = old_vn.lstrip('v')
+          parts = list(map(int, clean_vn.split('.')))
+          while len(parts) < 3:
+              parts.append(0)
+
+          major, minor, patch = parts[0], parts[1], parts[2]
+
+          if bump_type == "major":
+              major += 1
+              minor = 0
+              patch = 0
+          elif bump_type == "minor":
+              minor += 1
+              patch = 0
+          else:  # patch
+              patch += 1
+
+          new_vn = f"{major}.{minor}.{patch}"
+
+          new_content = re.sub(r'versionCode\s*=\s*\d+', f'versionCode = {new_vc}', content)
+          new_content = re.sub(r'versionName\s*=\s*"[^"]+"', f'versionName = "{new_vn}"', new_content)
+
+          with open(gradle_path, "w") as f:
+              f.write(new_content)
+
+          print(f"Updated versionCode: {old_vc} -> {new_vc}")
+          print(f"Updated versionName: {old_vn} -> {new_vn}")
+
+          github_output = os.environ.get('GITHUB_OUTPUT')
+          if github_output:
+              with open(github_output, 'a') as go:
+                  go.write(f"new_version={new_vn}\n")
+                  go.write(f"tag_name=v{new_vn}\n")
+          EOF
+
+      - name: Commit, Tag, and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          TAG_NAME="${{ steps.bump.outputs.tag_name }}"
+          VERSION_NAME="${{ steps.bump.outputs.new_version }}"
+
+          git add app/build.gradle.kts
+          git commit -m "chore(release): bump version to ${VERSION_NAME}"
+          git tag -a "${TAG_NAME}" -m "Release ${TAG_NAME}"
+
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "${TAG_NAME}"
