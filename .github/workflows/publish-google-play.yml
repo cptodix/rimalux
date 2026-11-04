@@ -45,6 +45,33 @@ on:
         required: false
         default: ''
         type: string
+  workflow_call:
+    inputs:
+      track:
+        description: 'Google Play Console release track'
+        required: false
+        default: 'internal'
+        type: string
+      release_status:
+        description: 'Play release status'
+        required: false
+        default: 'completed'
+        type: string
+      user_fraction:
+        description: 'Staged rollout fraction (0.01 to 0.99)'
+        required: false
+        default: ''
+        type: string
+      in_app_update_priority:
+        description: 'In-app update priority (0 to 5)'
+        required: false
+        default: '0'
+        type: string
+      git_ref:
+        description: 'Optional tag or branch'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -190,3 +217,4 @@ jobs:
           userFraction: ${{ inputs.release_status == 'inProgress' && inputs.user_fraction || '' }}
           inAppUpdatePriority: ${{ inputs.in_app_update_priority }}
           whatsNewDirectory: ${{ steps.meta.outputs.whatsnew_dir }}
+          mappingFile: app/build/outputs/mapping/release/mapping.txt

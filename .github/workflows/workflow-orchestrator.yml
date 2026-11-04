@@ -1,13 +1,52 @@
-# .github/workflows/orchestrator.yml
-name: Run Pipeline Back to Back
+# .github/workflows/workflow-orchestrator.yml
+name: Run Pipeline Back to Back (Bump Version & Publish to Play Console)
 
 on:
   workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Select version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      track:
+        description: 'Google Play Console release track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      release_status:
+        description: 'Play release status'
+        required: true
+        default: 'completed'
+        type: choice
+        options:
+          - completed
+          - draft
+          - inProgress
+          - halted
 
 jobs:
   step-one:
+    name: Bump Version & Create Tag
     uses: ./.github/workflows/version-increment.yml
+    with:
+      bump_type: ${{ inputs.bump_type }}
 
   step-two:
-    needs: step-one # Waits for step-one to complete before starting
+    name: Build & Publish to Play Console
+    needs: step-one
     uses: ./.github/workflows/publish-google-play.yml
+    with:
+      track: ${{ inputs.track }}
+      release_status: ${{ inputs.release_status }}
+      git_ref: ${{ needs.step-one.outputs.tag_name }}
+    secrets: inherit

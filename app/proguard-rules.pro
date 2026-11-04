@@ -14,8 +14,15 @@
 
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes SourceFile,LineNumberTable
 
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
-#-renamesourcefileattribute SourceFile
+-renamesourcefileattribute SourceFile
+
+# Google Play Billing Library
+-keep class com.android.billingclient.api.** { *; }
+
+# Rimalux Core Engine and Data Models (preserve enum names, pattern IDs, palette IDs)
+-keep class com.cptodix.rimalux.oled.wallpaper.model.** { *; }
+-keep class com.cptodix.rimalux.oled.wallpaper.engine.** { *; }

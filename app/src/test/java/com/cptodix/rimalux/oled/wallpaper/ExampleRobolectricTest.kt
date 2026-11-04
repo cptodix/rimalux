@@ -1627,8 +1627,8 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun bottomSheetAboutFooter_displaysVersionOnePointZeroPointZeroAndStudioCreditAtBottom() {
-        assertEquals("1.0.0", BuildConfig.VERSION_NAME)
+    fun bottomSheetAboutFooter_displaysCurrentVersionNameAndStudioCreditAtBottom() {
+        assertTrue(BuildConfig.VERSION_NAME.isNotBlank())
 
         composeTestRule.waitForIdle()
         val viewModel = ViewModelProvider(
@@ -1645,7 +1645,7 @@ class ExampleRobolectricTest {
         composeTestRule.waitForIdle()
 
         val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-        val expectedText = "Rimalux v1.0.0 by Cptodix Studio @$currentYear"
+        val expectedText = "Rimalux v${BuildConfig.VERSION_NAME} by Cptodix Studio @$currentYear"
         composeTestRule.onNodeWithTag("sheet_about_footer").assertIsDisplayed()
         composeTestRule.onNodeWithText(expectedText).assertIsDisplayed()
     }

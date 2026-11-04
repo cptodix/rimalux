@@ -12,6 +12,20 @@ on:
           - patch
           - minor
           - major
+  workflow_call:
+    inputs:
+      bump_type:
+        description: 'Select version bump type'
+        required: false
+        default: 'patch'
+        type: string
+    outputs:
+      new_version:
+        description: 'New versionName'
+        value: ${{ jobs.bump-version.outputs.new_version }}
+      tag_name:
+        description: 'New git tag name'
+        value: ${{ jobs.bump-version.outputs.tag_name }}
 
 permissions:
   contents: write
@@ -20,6 +34,9 @@ jobs:
   bump-version:
     name: Increment Version & Tag Repository
     runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      tag_name: ${{ steps.bump.outputs.tag_name }}
 
     steps:
       - name: Checkout Code

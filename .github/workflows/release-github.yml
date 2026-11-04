@@ -106,14 +106,15 @@ jobs:
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/${APK_FILENAME}"
           cp app/build/outputs/bundle/release/app-release.aab "dist/${AAB_FILENAME}"
+          if [ -f "app/build/outputs/mapping/release/mapping.txt" ]; then
+            cp app/build/outputs/mapping/release/mapping.txt "dist/${BASE_FILENAME}_mapping.txt"
+          fi
 
       - name: Upload APK and AAB to workflow artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.meta.outputs.base_filename }}
-          path: |
-            dist/${{ steps.meta.outputs.apk_filename }}
-            dist/${{ steps.meta.outputs.aab_filename }}
+          path: dist/*
           if-no-files-found: error
           retention-days: 30
 
@@ -129,6 +130,5 @@ jobs:
             ### Release Packages (`${{ steps.meta.outputs.build_date }}`)
             - **Phone Sideload APK:** `${{ steps.meta.outputs.apk_filename }}`
             - **Google Play Console App Bundle (AAB):** `${{ steps.meta.outputs.aab_filename }}`
-          files: |
-            dist/${{ steps.meta.outputs.apk_filename }}
-            dist/${{ steps.meta.outputs.aab_filename }}
+            - **R8 Deobfuscation Mapping:** `${{ steps.meta.outputs.base_filename }}_mapping.txt`
+          files: dist/*
