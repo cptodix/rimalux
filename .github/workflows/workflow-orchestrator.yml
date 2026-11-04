@@ -1,0 +1,13 @@
+# .github/workflows/orchestrator.yml
+name: Run Pipeline Back to Back
+
+on:
+  workflow_dispatch:
+
+jobs:
+  step-one:
+    uses: ./.github/workflows/version-increment.yml
+
+  step-two:
+    needs: step-one # Waits for step-one to complete before starting
+    uses: ./.github/workflows/publish-google-play.yml
