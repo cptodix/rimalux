@@ -20,9 +20,37 @@
 # hide the original source file name.
 -renamesourcefileattribute SourceFile
 
+# AndroidX WorkManager & Room Database reflection
+# Room instantiates WorkDatabase_Impl via reflection; R8 strips its constructor unless kept
+-keep class * extends androidx.room.RoomDatabase {
+    public <init>();
+    *;
+}
+-keep class androidx.work.impl.WorkDatabase_Impl {
+    public <init>();
+    *;
+}
+-keep class androidx.work.impl.** { *; }
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+-keep class com.cptodix.rimalux.oled.wallpaper.scheduler.WallpaperRotationWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+
+# AndroidX App Startup Initializers (loaded reflectively by InitializationProvider)
+-keep class * implements androidx.startup.Initializer {
+    public <init>();
+}
+
 # Google Play Billing Library
 -keep class com.android.billingclient.api.** { *; }
 
 # Rimalux Core Engine and Data Models (preserve enum names, pattern IDs, palette IDs)
 -keep class com.cptodix.rimalux.oled.wallpaper.model.** { *; }
 -keep class com.cptodix.rimalux.oled.wallpaper.engine.** { *; }
+
+# Kotlin Coroutines
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
