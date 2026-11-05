@@ -2,7 +2,7 @@
 
 This document explains Rimalux's internal architecture and provides the exact mathematical and rendering specifications needed to port the core wallpaper engine (`com.cptodix.rimalux.oled.wallpaper.engine`) to iOS (Swift / CoreGraphics / Metal), Web (TypeScript / Canvas2D / WebGL / SVG), Desktop, or Kotlin Multiplatform (`commonMain`).
 
-Make sure to also read [`../AGENTS.md`](../AGENTS.md) for mandatory project rules and restrictions.
+Make sure to also read [`../AGENTS.md`](../AGENTS.md) for mandatory project rules and restrictions, and [`PATTERNS_DIRECTORY.md`](PATTERNS_DIRECTORY.md) for the complete directory of all 80 patterns, source file locations, and mathematical algorithms.
 
 ---
 
