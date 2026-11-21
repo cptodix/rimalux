@@ -4,7 +4,6 @@
 -->
 
 <div align="center">
-  <br />
   <p align="center">
     <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png" width="96" height="96" alt="Time Overlay icon">
   </p>
@@ -13,14 +12,6 @@
           Infinite, native-resolution wallpapers engineered for exact <code>#000000</code> True Black ratios, custom color harmonies, and effortless OLED battery savings. <strong>0 Ads · 100% Free.</strong>
   </p>
   
-  <p>
-    <img src="https://img.shields.io/badge/Version-1.4.0-00F5D4?style=flat-square&labelColor=0D0D0D" alt="Version 1.4.0" />
-    <img src="https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-3DDC84?style=flat-square&labelColor=0D0D0D&logo=android&logoColor=white" alt="Android 7.0+" />
-    <img src="https://img.shields.io/badge/Patterns-80%20Math%20Engines-FF8A65?style=flat-square&labelColor=0D0D0D" alt="80 Math Patterns" />
-    <img src="https://img.shields.io/badge/Ads-0%20%7C%20100%25%20Free-7B2CBF?style=flat-square&labelColor=0D0D0D" alt="Zero Ads" />
-    <img src="https://img.shields.io/badge/License-PolyForm%20Perimeter%201.0.1-E4E4E7?style=flat-square&labelColor=0D0D0D" alt="PolyForm Perimeter 1.0.1" />
-  </p>
-
   <br />
 
   <img src="distribution/brand/rimalux_store_banner.png" alt="Rimalux OLED Procedural Wallpaper Store Banner" width="880" />
