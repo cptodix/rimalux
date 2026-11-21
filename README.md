@@ -5,21 +5,14 @@
 
 <div align="center">
   <br />
-  <table>
-    <tr>
-      <td width="112" align="center" valign="middle">
-        <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png" alt="Rimalux App Icon" width="96" height="96" />
-      </td>
-      <td valign="middle">
-        <h1 align="left">Rimalux</h1>
-        <p align="left">
-          <strong>Procedural OLED Vector Wallpapers — Zero Slop, Pure Mathematics.</strong><br />
+  <p align="center">
+    <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png" width="96" height="96" alt="Time Overlay icon">
+  </p>
+  <h1 align="center">Rimalux</h1>
+  <p align="center"><strong>Procedural OLED Vector Wallpapers</strong><br />
           Infinite, native-resolution wallpapers engineered for exact <code>#000000</code> True Black ratios, custom color harmonies, and effortless OLED battery savings. <strong>0 Ads · 100% Free.</strong>
-        </p>
-      </td>
-    </tr>
-  </table>
-
+  </p>
+  
   <p>
     <img src="https://img.shields.io/badge/Version-1.4.0-00F5D4?style=flat-square&labelColor=0D0D0D" alt="Version 1.4.0" />
     <img src="https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-3DDC84?style=flat-square&labelColor=0D0D0D&logo=android&logoColor=white" alt="Android 7.0+" />
@@ -37,10 +30,6 @@
   <a href="https://play.google.com/store/apps/details?id=com.cptodix.rimalux.oled.wallpaper" target="_blank" rel="noopener noreferrer">
     <img src="distribution/brand/GetItOnGooglePlay_Badge_Web_color_English.svg" alt="Get it on Google Play" width="220" />
   </a>
-
-  <p>
-    <sub>Direct Store Link: <a href="https://play.google.com/store/apps/details?id=com.cptodix.rimalux.oled.wallpaper">play.google.com/store/apps/details?id=com.cptodix.rimalux.oled.wallpaper</a></sub>
-  </p>
 </div>
 
 <hr />
