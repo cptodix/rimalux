@@ -52,6 +52,7 @@ private val Context.rimaluxDataStore: DataStore<Preferences>
 data class StoredWallpaperState(
     val config: GeneratorConfig = GeneratorConfig(),
     val currentSeed: Long = 0L,
+    val currentGeometrySeed: Long? = null,
     val currentPattern: ArtPattern? = null,
     val currentPatternWeightMode: PatternWeightMode? = null,
     val currentColors: List<Long> = emptyList(),
@@ -88,6 +89,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
         val NEXT_RUN_MILLIS = longPreferencesKey("next_run_millis")
         val LAST_AUTO_EXEC_MILLIS = longPreferencesKey("last_auto_exec_millis")
         val CURRENT_SEED = longPreferencesKey("current_seed")
+        val CURRENT_GEOMETRY_SEED = longPreferencesKey("current_geometry_seed")
         val CURRENT_PATTERN = stringPreferencesKey("current_pattern")
         val CURRENT_COLORS_JSON = stringPreferencesKey("current_colors_json")
         val USER_PALETTES_JSON = stringPreferencesKey("user_palettes_json")
@@ -110,6 +112,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
         StoredWallpaperState(
             config = config,
             currentSeed = prefs[Keys.CURRENT_SEED] ?: 0L,
+            currentGeometrySeed = prefs[Keys.CURRENT_GEOMETRY_SEED],
             currentPattern = prefs[Keys.CURRENT_PATTERN]?.let { ArtPattern.fromId(it) },
             currentPatternWeightMode = prefs[Keys.CURRENT_WEIGHT_MODE]?.let { PatternWeightMode.fromId(it) },
             currentColors = decodeLongList(prefs[Keys.CURRENT_COLORS_JSON]),
@@ -261,6 +264,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
     suspend fun recordGeneration(item: GeneratedHistoryItem, isAutoTick: Boolean = false) = withContext(Dispatchers.IO) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = item.seed
+            prefs[Keys.CURRENT_GEOMETRY_SEED] = item.geometrySeed
             prefs[Keys.CURRENT_PATTERN] = item.pattern.id
             prefs[Keys.CURRENT_WEIGHT_MODE] = item.patternWeightMode.id
             prefs[Keys.CURRENT_COLORS_JSON] = encodeLongList(item.paletteColors)
@@ -283,6 +287,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
     ) = withContext(Dispatchers.IO) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = primaryItem.seed
+            prefs[Keys.CURRENT_GEOMETRY_SEED] = primaryItem.geometrySeed
             prefs[Keys.CURRENT_PATTERN] = primaryItem.pattern.id
             prefs[Keys.CURRENT_WEIGHT_MODE] = primaryItem.patternWeightMode.id
             prefs[Keys.CURRENT_COLORS_JSON] = encodeLongList(primaryItem.paletteColors)
@@ -311,6 +316,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
     ) = withContext(Dispatchers.IO) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = current.seed
+            prefs[Keys.CURRENT_GEOMETRY_SEED] = current.geometrySeed
             prefs[Keys.CURRENT_PATTERN] = current.pattern.id
             prefs[Keys.CURRENT_WEIGHT_MODE] = current.patternWeightMode.id
             prefs[Keys.CURRENT_COLORS_JSON] = encodeLongList(current.paletteColors)
@@ -464,6 +470,7 @@ class WallpaperPreferencesRepository(private val context: Context) {
             val obj = JSONObject()
             obj.put("id", item.id)
             obj.put("seed", item.seed)
+            obj.put("geoSeed", item.geometrySeed)
             obj.put("pattern", item.pattern.id)
             obj.put("weightMode", item.patternWeightMode.id)
             obj.put("fillMode", item.colorFillMode.id)
@@ -489,10 +496,12 @@ class WallpaperPreferencesRepository(private val context: Context) {
                 val fillMode = ColorFillMode.fromId(obj.optString("fillMode", ColorFillMode.GRADIENT.id))
                 val colors = decodeLongList(obj.optString("colors"))
                 if (colors.isNotEmpty()) {
+                    val itemSeed = obj.getLong("seed")
+                    val geoSeed = obj.optLong("geoSeed", itemSeed)
                     result.add(
                         GeneratedHistoryItem(
                             id = obj.getString("id"),
-                            seed = obj.getLong("seed"),
+                            seed = itemSeed,
                             pattern = pattern,
                             colorFillMode = fillMode,
                             paletteColors = colors,
@@ -500,7 +509,8 @@ class WallpaperPreferencesRepository(private val context: Context) {
                             intricacy = obj.optDouble("intricacy", 0.50).toFloat(),
                             timestampMillis = obj.getLong("ts"),
                             wasAutoScheduled = obj.optBoolean("scheduled", false),
-                            patternWeightMode = weightMode
+                            patternWeightMode = weightMode,
+                            geometrySeed = geoSeed
                         )
                     )
                 }

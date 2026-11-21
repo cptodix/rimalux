@@ -13,8 +13,10 @@ import androidx.lifecycle.viewModelScope
 import com.cptodix.rimalux.oled.wallpaper.R
 import com.cptodix.rimalux.oled.wallpaper.data.WallpaperPreferencesRepository
 import com.cptodix.rimalux.oled.wallpaper.engine.ColorHarmonyEngine
+import com.cptodix.rimalux.oled.wallpaper.engine.DeepBlackRatioEngine
 import com.cptodix.rimalux.oled.wallpaper.engine.MathPatternGenerator
 import com.cptodix.rimalux.oled.wallpaper.engine.SceneRatioStats
+import com.cptodix.rimalux.oled.wallpaper.engine.SynthesizedWallpaper
 import com.cptodix.rimalux.oled.wallpaper.engine.VectorScene
 import com.cptodix.rimalux.oled.wallpaper.engine.WallpaperGeneratorEngine
 import com.cptodix.rimalux.oled.wallpaper.model.AppLanguage
@@ -81,7 +83,8 @@ data class RenderedPreviewSnapshot(
     val intricacy: Float,
     val ratioStats: SceneRatioStats,
     val scene: VectorScene,
-    val imageBitmap: ImageBitmap
+    val imageBitmap: ImageBitmap,
+    val geometrySeed: Long = seed
 ) {
     fun toHistoryItem(wasAutoScheduled: Boolean = false): GeneratedHistoryItem {
         return GeneratedHistoryItem(
@@ -94,7 +97,8 @@ data class RenderedPreviewSnapshot(
             pitchBlackRatio = pitchBlackRatio,
             intricacy = intricacy,
             timestampMillis = System.currentTimeMillis(),
-            wasAutoScheduled = wasAutoScheduled
+            wasAutoScheduled = wasAutoScheduled,
+            geometrySeed = geometrySeed
         )
     }
 }
@@ -194,12 +198,23 @@ class RimaluxViewModel(
     private val pendingGestureWrites = EnumMap<StudioGestureAction, Long>(StudioGestureAction::class.java)
     private var lastObservedAutoExecMillis = 0L
     private var isExecutingScheduledTick = false
+    private data class PendingSettingChanges(
+        val patternChanged: Boolean = false,
+        val patternWeightChanged: Boolean = false,
+        val paletteChanged: Boolean = false,
+        val colorFillChanged: Boolean = false,
+        val pitchBlackChanged: Boolean = false
+    )
+
     private var pendingRandomColors: List<Long>? = null
+    private var pendingPickedPattern: ArtPattern? = null
+    private var pendingSettingChanges = PendingSettingChanges()
     private var prefetchEpoch = 0L
     private var seedCounter = 1L
     private var isWaitingPrefetchDebounce = false
     private var prefetchJob: Job? = null
     private var previousRenderJob: Job? = null
+    private var refreshJob: Job? = null
     private var configSaveJob: Job? = null
 
     init {
@@ -299,7 +314,8 @@ class RimaluxViewModel(
                             pitchBlackRatio = effectiveBlackRatio,
                             colorFillMode = stored.config.colorFillMode,
                             patternWeightMode = effectiveWeightMode,
-                            intricacy = effectiveIntricacy
+                            intricacy = effectiveIntricacy,
+                            geometrySeed = stored.currentGeometrySeed ?: stored.currentSeed
                         )
                         renderedCache[rendered.seed] = rendered
                         _uiState.update { state ->
@@ -340,6 +356,9 @@ class RimaluxViewModel(
                         ?: GeneratorConfig.sampleIntricacyForSeed(seedToUse)
                     val effectiveWeightMode = stored.currentPatternWeightMode
                         ?: stored.config.patternWeightMode
+                    refreshJob?.cancel()
+                    pendingSettingChanges = PendingSettingChanges()
+                    pendingPickedPattern = null
                     val rendered = buildRenderedPreview(
                         seed = seedToUse,
                         pattern = patternToUse,
@@ -347,7 +366,8 @@ class RimaluxViewModel(
                         pitchBlackRatio = effectiveBlackRatio,
                         colorFillMode = stored.config.colorFillMode,
                         patternWeightMode = effectiveWeightMode,
-                        intricacy = effectiveIntricacy
+                        intricacy = effectiveIntricacy,
+                        geometrySeed = stored.currentGeometrySeed ?: seedToUse
                     )
                     renderedCache[rendered.seed] = rendered
                     val resolvedTimestamps = StudioGestureAction.entries.associateWith { action ->
@@ -599,14 +619,235 @@ class RimaluxViewModel(
      * (or switches to the pitch-black loading slot if the user swiped faster than background synthesis).
      */
     fun swipeLeftToNextWallpaper(): Boolean {
+        return promoteNextWallpaper(recordSwipeLeftGesture = true)
+    }
+
+    /**
+     * Refreshes the active wallpaper immediately when the user taps the pending-changes pill:
+     * keeps every unchanged wallpaper property (geometry seed, pattern, layout, colors, fill mode,
+     * black ratio, intricacy) and applies only the settings changed since the current wallpaper,
+     * while pushing the old-settings wallpaper preview to history (`pastStack`) for swipe-right A/B comparison.
+     */
+    fun refreshWallpaperAfterSettingsChange(): Boolean {
+        val currentSnapshot = _uiState.value
+        if (!currentSnapshot.hasUnappliedChanges) {
+            return false
+        }
+        val active = currentSnapshot.preview
+        if (active == null) {
+            return promoteNextWallpaper(recordSwipeLeftGesture = false)
+        }
+
         onPreviewUserActivity()
+        val changes = pendingSettingChanges
+        val pickedPatternHint = pendingPickedPattern
+        val explicitRandomColors = pendingRandomColors
+        pendingSettingChanges = PendingSettingChanges()
+        pendingPickedPattern = null
+        pendingRandomColors = null
+
+        val config = currentSnapshot.config
+        val userPalettes = currentSnapshot.userPalettes
+        val newSeed = nextUniqueSeed()
+        val keptGeometrySeed = active.geometrySeed
+        val keptIntricacy = active.intricacy
+
+        val resolvedPattern: ArtPattern = if (!changes.patternChanged &&
+            (config.patternsRandomized || config.selectedPatterns.isEmpty() || active.pattern in config.selectedPatterns)
+        ) {
+            active.pattern
+        } else if (!config.patternsRandomized) {
+            val pool = config.selectedPatterns
+            when {
+                pool.isEmpty() -> MathPatternGenerator.resolvePatternForSeed(
+                    seed = newSeed,
+                    patternsRandomized = true,
+                    selectedPatterns = pool,
+                    excludePattern = active.pattern
+                )
+                pool.size == 1 -> pool.first()
+                pickedPatternHint != null && pickedPatternHint in pool && pickedPatternHint != active.pattern ->
+                    pickedPatternHint
+                active.pattern !in pool -> MathPatternGenerator.resolvePatternForSeed(
+                    seed = newSeed,
+                    patternsRandomized = false,
+                    selectedPatterns = pool
+                )
+                else -> MathPatternGenerator.resolvePatternForSeed(
+                    seed = newSeed,
+                    patternsRandomized = false,
+                    selectedPatterns = pool,
+                    excludePattern = active.pattern
+                )
+            }
+        } else {
+            MathPatternGenerator.resolvePatternForSeed(
+                seed = newSeed,
+                patternsRandomized = true,
+                selectedPatterns = config.selectedPatterns,
+                excludePattern = active.pattern
+            )
+        }
+
+        val resolvedWeightMode = if (changes.patternWeightChanged) {
+            config.patternWeightMode
+        } else {
+            active.patternWeightMode
+        }
+
+        val resolvedColorFillMode = if (changes.colorFillChanged) {
+            config.colorFillMode
+        } else {
+            active.colorFillMode
+        }
+
+        val resolvedColors: List<Long> = if (!changes.paletteChanged) {
+            active.colors
+        } else {
+            when (config.paletteMode) {
+                PaletteMode.RANDOMIZED -> {
+                    explicitRandomColors?.takeIf { it.isNotEmpty() }
+                        ?: currentSnapshot.stagedColors.takeIf { it.isNotEmpty() && it != active.colors }
+                        ?: ColorHarmonyEngine.selectColorsForSeed(
+                            seed = newSeed,
+                            paletteMode = PaletteMode.RANDOMIZED,
+                            selectedPaletteIds = emptySet(),
+                            availablePalettes = userPalettes,
+                            excludeColors = active.colors
+                        )
+                }
+                PaletteMode.PALETTE_LIST -> {
+                    val staged = currentSnapshot.stagedColors
+                    if (staged.isNotEmpty() && staged != active.colors) {
+                        staged
+                    } else if (config.selectedPaletteIds.size > 1) {
+                        ColorHarmonyEngine.selectColorsForSeed(
+                            seed = newSeed,
+                            paletteMode = PaletteMode.PALETTE_LIST,
+                            selectedPaletteIds = config.selectedPaletteIds,
+                            availablePalettes = userPalettes,
+                            excludeColors = active.colors
+                        )
+                    } else {
+                        ColorHarmonyEngine.selectColorsForSeed(
+                            seed = newSeed,
+                            paletteMode = PaletteMode.PALETTE_LIST,
+                            selectedPaletteIds = config.selectedPaletteIds,
+                            availablePalettes = userPalettes
+                        )
+                    }
+                }
+            }
+        }
+
+        val resolvedBlackRatio: Float = if (!changes.pitchBlackChanged) {
+            active.pitchBlackRatio
+        } else {
+            DeepBlackRatioEngine.resolveTargetBlackRatio(
+                mode = config.pitchBlackMode,
+                singleRatio = config.pitchBlackRatio,
+                rangeMin = config.pitchBlackRangeMin,
+                rangeMax = config.pitchBlackRangeMax,
+                rng = Random(newSeed xor 0x517CC1B727220A95L)
+            )
+        }
+
+        configSaveJob?.cancel()
+        viewModelScope.launch {
+            val latestConfig = _uiState.value.config
+            repository.updateConfig { storedConfig ->
+                latestConfig.copy(
+                    autoRotateEnabled = storedConfig.autoRotateEnabled,
+                    intervalMinutes = storedConfig.intervalMinutes,
+                    nextRunEpochMillis = storedConfig.nextRunEpochMillis
+                )
+            }
+        }
+
+        refreshJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                hasUnappliedChanges = false,
+                isGeneratingPreview = true
+            )
+        }
+
+        val canReuseScene = resolvedPattern == active.pattern &&
+            resolvedWeightMode == active.patternWeightMode
+
+        refreshJob = viewModelScope.launch {
+            val rendered = withContext(Dispatchers.Default) {
+                if (canReuseScene) {
+                    val clampedRatio = DeepBlackRatioEngine.clampPitchBlackRatio(resolvedBlackRatio)
+                    val safeColors = resolvedColors.ifEmpty { StarterPalettes.defaults.first().colors }
+                    val synthesized = SynthesizedWallpaper(
+                        seed = newSeed,
+                        pattern = resolvedPattern,
+                        paletteColors = safeColors,
+                        colorFillMode = resolvedColorFillMode,
+                        pitchBlackRatio = clampedRatio,
+                        intricacy = keptIntricacy,
+                        aspectRatio = active.scene.aspectRatio,
+                        scene = active.scene,
+                        ratioStats = active.scene.computeStats(clampedRatio),
+                        patternWeightMode = resolvedWeightMode,
+                        geometrySeed = keptGeometrySeed
+                    )
+                    rasterizeSynthesizedPreview(synthesized)
+                } else {
+                    val synthesized = WallpaperGeneratorEngine.synthesizeFromParameters(
+                        seed = newSeed,
+                        pattern = resolvedPattern,
+                        paletteColors = resolvedColors,
+                        colorFillMode = resolvedColorFillMode,
+                        pitchBlackRatio = resolvedBlackRatio,
+                        intricacy = keptIntricacy,
+                        aspectRatio = screenAspect,
+                        patternWeightMode = resolvedWeightMode,
+                        geometrySeed = keptGeometrySeed
+                    )
+                    rasterizeSynthesizedPreview(synthesized)
+                }
+            }
+
+            if (!isActive) return@launch
+
+            renderedCache[active.seed] = active
+            pushPastItem(active.toHistoryItem())
+            renderedCache[rendered.seed] = rendered
+            val updatedHistory = buildCurrentHistoryList(rendered)
+            _uiState.update { state ->
+                state.copy(
+                    preview = rendered,
+                    stagedColors = rendered.colors,
+                    previousPreview = pastStack.lastOrNull()?.let { renderedCache[it.seed] },
+                    nextPreview = aheadQueue.firstOrNull(),
+                    canSwipeRight = pastStack.isNotEmpty(),
+                    aheadReadyCount = aheadQueue.size,
+                    history = updatedHistory,
+                    isGeneratingPreview = false
+                )
+            }
+            persistActiveDeck(rendered)
+            ensureDeckPrefetchIfIdle()
+        }
+        return true
+    }
+
+    private fun promoteNextWallpaper(recordSwipeLeftGesture: Boolean): Boolean {
+        onPreviewUserActivity()
+        refreshJob?.cancel()
+        pendingSettingChanges = PendingSettingChanges()
+        pendingPickedPattern = null
         val currentSnapshot = _uiState.value
         val active = currentSnapshot.preview
         if (active == null && currentSnapshot.isGeneratingPreview) {
             return false
         }
 
-        recordSuccessfulGesture(StudioGestureAction.SWIPE_LEFT)
+        if (recordSwipeLeftGesture) {
+            recordSuccessfulGesture(StudioGestureAction.SWIPE_LEFT)
+        }
 
         if (active != null) {
             renderedCache[active.seed] = active
@@ -645,7 +886,8 @@ class RimaluxViewModel(
             persistActiveDeck(readyNext)
             ensureDeckPrefetchIfIdle()
         } else {
-            // User outran ahead queue: show centered OLED loading state while prefetch synthesizes
+            // User triggered refresh faster than background synthesis: keep old wallpaper in history
+            // and show centered OLED loading state while prefetch finishes synthesizing the new one.
             val updatedHistory = buildCurrentHistoryList(null)
             _uiState.update { state ->
                 state.copy(
@@ -674,6 +916,7 @@ class RimaluxViewModel(
             recordRightEdgeBounce()
             return false
         }
+        refreshJob?.cancel()
 
         recordSuccessfulGesture(StudioGestureAction.SWIPE_RIGHT)
 
@@ -728,7 +971,8 @@ class RimaluxViewModel(
                     pitchBlackRatio = prevItem.pitchBlackRatio,
                     colorFillMode = prevItem.colorFillMode,
                     patternWeightMode = prevItem.patternWeightMode,
-                    intricacy = prevItem.intricacy
+                    intricacy = prevItem.intricacy,
+                    geometrySeed = prevItem.geometrySeed
                 )
                 renderedCache[rendered.seed] = rendered
                 val updatedHistory = buildCurrentHistoryList(rendered)
@@ -760,7 +1004,8 @@ class RimaluxViewModel(
                 pitchBlackRatio = target.pitchBlackRatio,
                 colorFillMode = target.colorFillMode,
                 patternWeightMode = target.patternWeightMode,
-                intricacy = target.intricacy
+                intricacy = target.intricacy,
+                geometrySeed = target.geometrySeed
             )
             renderedCache[target.seed] = rendered
             if (pastStack.lastOrNull()?.seed == target.seed) {
@@ -817,7 +1062,8 @@ class RimaluxViewModel(
         pitchBlackRatio: Float,
         colorFillMode: ColorFillMode,
         patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL,
-        intricacy: Float
+        intricacy: Float,
+        geometrySeed: Long = seed
     ): RenderedPreviewSnapshot = withContext(Dispatchers.Default) {
         val synthesized = WallpaperGeneratorEngine.synthesizeFromParameters(
             seed = seed,
@@ -827,13 +1073,14 @@ class RimaluxViewModel(
             pitchBlackRatio = pitchBlackRatio,
             intricacy = intricacy,
             aspectRatio = screenAspect,
-            patternWeightMode = patternWeightMode
+            patternWeightMode = patternWeightMode,
+            geometrySeed = geometrySeed
         )
         rasterizeSynthesizedPreview(synthesized)
     }
 
     private fun rasterizeSynthesizedPreview(
-        synthesized: com.cptodix.rimalux.oled.wallpaper.engine.SynthesizedWallpaper
+        synthesized: SynthesizedWallpaper
     ): RenderedPreviewSnapshot {
         val previewWidth = 640
         val previewHeight = (previewWidth * screenAspect).roundToInt().coerceIn(640, 1480)
@@ -855,7 +1102,8 @@ class RimaluxViewModel(
             intricacy = synthesized.intricacy,
             ratioStats = synthesized.ratioStats,
             scene = synthesized.scene,
-            imageBitmap = bitmap.asImageBitmap()
+            imageBitmap = bitmap.asImageBitmap(),
+            geometrySeed = synthesized.geometrySeed
         )
     }
 
@@ -1273,9 +1521,10 @@ class RimaluxViewModel(
         postStatus(localizedContext.getString(R.string.msg_wallpaper_share_error, reason))
     }
 
-    // --- Pitch Black Controls (Rebuilds ahead queue for next swipe-left) ---
+    // --- Pitch Black Controls (Rebuilds ahead queue & marks black ratio delta) ---
     fun setPitchBlackMode(mode: PitchBlackMode) {
         if (_uiState.value.config.pitchBlackMode == mode) return
+        pendingSettingChanges = pendingSettingChanges.copy(pitchBlackChanged = true)
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(pitchBlackMode = mode),
@@ -1288,6 +1537,7 @@ class RimaluxViewModel(
 
     fun updatePitchBlackRatio(ratio: Float) {
         val clamped = ratio.coerceIn(0f, 0.95f)
+        pendingSettingChanges = pendingSettingChanges.copy(pitchBlackChanged = true)
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(
@@ -1304,6 +1554,7 @@ class RimaluxViewModel(
     fun updatePitchBlackRange(minRatio: Float, maxRatio: Float) {
         val lo = min(minRatio, maxRatio).coerceIn(0f, 0.95f)
         val hi = max(minRatio, maxRatio).coerceIn(lo, 0.95f)
+        pendingSettingChanges = pendingSettingChanges.copy(pitchBlackChanged = true)
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(
@@ -1333,12 +1584,13 @@ class RimaluxViewModel(
         persistConfigChanges(debounceMs = 0L)
     }
 
-    // --- Procedural Pattern Controls (Rebuilds ahead queue for next swipe-left) ---
+    // --- Procedural Pattern Controls (Rebuilds ahead queue & marks pattern/layout deltas) ---
     fun setPatternWeightMode(weightMode: PatternWeightMode) {
         if (_uiState.value.config.patternWeightMode == weightMode) {
             _uiState.update { it.copy(isPatternLayoutDialogOpen = false) }
             return
         }
+        pendingSettingChanges = pendingSettingChanges.copy(patternWeightChanged = true)
         _uiState.update { state ->
             state.copy(
                 isPatternLayoutDialogOpen = false,
@@ -1356,6 +1608,8 @@ class RimaluxViewModel(
 
     fun setPatternsRandomized(randomized: Boolean) {
         if (_uiState.value.config.patternsRandomized == randomized) return
+        pendingSettingChanges = pendingSettingChanges.copy(patternChanged = true)
+        pendingPickedPattern = null
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(patternsRandomized = randomized),
@@ -1378,6 +1632,14 @@ class RimaluxViewModel(
                 existing + pattern
             }
         }
+        pendingSettingChanges = pendingSettingChanges.copy(patternChanged = true)
+        pendingPickedPattern = if (pattern in updatedSet) {
+            pattern
+        } else if (pendingPickedPattern == pattern) {
+            null
+        } else {
+            pendingPickedPattern
+        }
 
         _uiState.update { state ->
             state.copy(
@@ -1393,6 +1655,8 @@ class RimaluxViewModel(
     }
 
     fun selectAllPatterns() {
+        pendingSettingChanges = pendingSettingChanges.copy(patternChanged = true)
+        pendingPickedPattern = null
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(
@@ -1407,6 +1671,8 @@ class RimaluxViewModel(
     }
 
     fun selectNonePatterns() {
+        pendingSettingChanges = pendingSettingChanges.copy(patternChanged = true)
+        pendingPickedPattern = null
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(
@@ -1420,12 +1686,13 @@ class RimaluxViewModel(
         invalidateAheadAndPrefetch(debounceMs = 0L)
     }
 
-    // --- Solid vs Gradient & Palette Controls (Rebuilds ahead queue for next swipe-left) ---
+    // --- Solid vs Gradient & Palette Controls (Rebuilds ahead queue & marks fill/palette deltas) ---
     fun setColorFillMode(fillMode: ColorFillMode) {
         if (_uiState.value.config.colorFillMode == fillMode) {
             _uiState.update { it.copy(isColorFillDialogOpen = false) }
             return
         }
+        pendingSettingChanges = pendingSettingChanges.copy(colorFillChanged = true)
         _uiState.update { state ->
             state.copy(
                 isColorFillDialogOpen = false,
@@ -1458,6 +1725,7 @@ class RimaluxViewModel(
                 active.colors
             }
         }
+        pendingSettingChanges = pendingSettingChanges.copy(paletteChanged = true)
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(paletteMode = mode),
@@ -1473,6 +1741,7 @@ class RimaluxViewModel(
         val baseSeed = _uiState.value.preview?.seed ?: 0x5F3759DFL
         val freshColors = RandomPaletteGenerator.generate(System.nanoTime() xor baseSeed)
         pendingRandomColors = freshColors
+        pendingSettingChanges = pendingSettingChanges.copy(paletteChanged = true)
         _uiState.update {
             it.copy(
                 config = it.config.copy(paletteMode = PaletteMode.RANDOMIZED),
@@ -1514,6 +1783,7 @@ class RimaluxViewModel(
             current.userPalettes.firstOrNull { it.id in updatedIds }?.colors ?: palette.colors
         }
         pendingRandomColors = null
+        pendingSettingChanges = pendingSettingChanges.copy(paletteChanged = true)
 
         _uiState.update { state ->
             state.copy(
@@ -1534,6 +1804,7 @@ class RimaluxViewModel(
         val firstColors = _uiState.value.userPalettes.firstOrNull()?.colors
             ?: StarterPalettes.defaults.first().colors
         pendingRandomColors = null
+        pendingSettingChanges = pendingSettingChanges.copy(paletteChanged = true)
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(
@@ -1552,6 +1823,7 @@ class RimaluxViewModel(
         val fallbackColors = _uiState.value.userPalettes.firstOrNull()?.colors
             ?: StarterPalettes.defaults.first().colors
         pendingRandomColors = null
+        pendingSettingChanges = pendingSettingChanges.copy(paletteChanged = true)
         _uiState.update { state ->
             state.copy(
                 config = state.config.copy(
@@ -1582,6 +1854,7 @@ class RimaluxViewModel(
             colors = validColors
         )
         pendingRandomColors = null
+        pendingSettingChanges = pendingSettingChanges.copy(paletteChanged = true)
         _uiState.update { state ->
             state.copy(
                 isCreatePaletteSheetOpen = false,
@@ -1608,6 +1881,9 @@ class RimaluxViewModel(
         val remainingPalettes = current.userPalettes.filterNot { it.id == paletteId }
         val remainingIds = (current.config.selectedPaletteIds - paletteId)
             .ifEmpty { setOf(remainingPalettes.first().id) }
+        if (wasSelectedInListMode) {
+            pendingSettingChanges = pendingSettingChanges.copy(paletteChanged = true)
+        }
 
         _uiState.update { state ->
             state.copy(

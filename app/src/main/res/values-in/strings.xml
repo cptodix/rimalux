@@ -87,7 +87,7 @@
     <string name="black_mode_range">Rentang</string>
     <string name="pitch_black_range_value">%1$d%% – %2$d%%</string>
     <string name="pitch_black_active_now">Kini %1$d%%</string>
-    <string name="preview_pending_changes_notice">Setelan diperbarui · Geser kiri untuk berikutnya</string>
+    <string name="preview_pending_changes_notice">Setelan diperbarui · Ketuk di sini untuk segarkan</string>
     <string name="preview_true_black_percent">%1$d%% Hitam Pekat</string>
 
     <string name="summary_patterns_random">Acak (%1$d)</string>

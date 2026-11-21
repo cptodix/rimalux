@@ -175,7 +175,8 @@ data class GeneratedHistoryItem(
     val intricacy: Float,
     val timestampMillis: Long,
     val wasAutoScheduled: Boolean,
-    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL
+    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL,
+    val geometrySeed: Long = seed
 )
 
 object IntervalFormatter {

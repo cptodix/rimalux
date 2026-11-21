@@ -87,7 +87,7 @@
     <string name="black_mode_range">Range</string>
     <string name="pitch_black_range_value">%1$d%% – %2$d%%</string>
     <string name="pitch_black_active_now">Now %1$d%%</string>
-    <string name="preview_pending_changes_notice">Settings updated · Swipe left for next</string>
+    <string name="preview_pending_changes_notice">Settings updated · Tap here to refresh</string>
     <string name="preview_true_black_percent">%1$d%% True Black</string>
 
     <string name="summary_patterns_random">Random (%1$d)</string>

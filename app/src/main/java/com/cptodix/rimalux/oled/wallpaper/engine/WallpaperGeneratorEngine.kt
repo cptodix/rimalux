@@ -117,12 +117,13 @@ object WallpaperGeneratorEngine {
         pitchBlackRatio: Float,
         intricacy: Float,
         aspectRatio: Float,
-        patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL
+        patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL,
+        geometrySeed: Long = seed
     ): SynthesizedWallpaper {
         val clampedRatio = DeepBlackRatioEngine.clampPitchBlackRatio(pitchBlackRatio)
         val safeColors = paletteColors.ifEmpty { StarterPalettes.defaults.first().colors }
         val scene = MathPatternGenerator.generate(
-            seed = seed,
+            seed = geometrySeed,
             pattern = pattern,
             intricacy = intricacy,
             aspectRatio = aspectRatio,
@@ -138,7 +139,8 @@ object WallpaperGeneratorEngine {
             aspectRatio = scene.aspectRatio,
             scene = scene,
             ratioStats = scene.computeStats(clampedRatio),
-            patternWeightMode = patternWeightMode
+            patternWeightMode = patternWeightMode,
+            geometrySeed = geometrySeed
         )
     }
 

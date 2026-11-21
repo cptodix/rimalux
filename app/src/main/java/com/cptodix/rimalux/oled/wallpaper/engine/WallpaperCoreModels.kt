@@ -607,7 +607,8 @@ data class SynthesizedWallpaper(
     val aspectRatio: Float,
     val scene: VectorScene,
     val ratioStats: SceneRatioStats,
-    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL
+    val patternWeightMode: PatternWeightMode = PatternWeightMode.NORMAL,
+    val geometrySeed: Long = seed
 )
 
 object StarterPalettes {

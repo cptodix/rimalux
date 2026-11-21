@@ -175,6 +175,7 @@ fun RimaluxApp(
                                 onRotateMiniHint = viewModel::rotateMiniHint,
                                 onHideMiniHint = viewModel::hideMiniHint,
                                 onOpenHintWindowFromMiniHint = viewModel::openHintWindowFromMiniHint,
+                                onRefreshAfterSettingsChange = viewModel::refreshWallpaperAfterSettingsChange,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

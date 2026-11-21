@@ -43,6 +43,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -211,6 +212,7 @@ fun StudioScreen(
     onRotateMiniHint: () -> Boolean = { false },
     onHideMiniHint: () -> Unit = {},
     onOpenHintWindowFromMiniHint: () -> Unit = {},
+    onRefreshAfterSettingsChange: () -> Boolean = { false },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -428,7 +430,7 @@ fun StudioScreen(
         }
         var measuredInfoPillHeightPx by remember { mutableIntStateOf(0) }
         var measuredMiniHintHeightPx by remember { mutableIntStateOf(0) }
-        val infoBottomOffsetDp = if (uiState.hasUnappliedChanges) 98.dp else 56.dp
+        val infoBottomOffsetDp = if (uiState.hasUnappliedChanges) 112.dp else 56.dp
         val infoPillHeightDp = if (measuredInfoPillHeightPx > 0) {
             with(density) { measuredInfoPillHeightPx.toDp() }
         } else {
@@ -587,26 +589,47 @@ fun StudioScreen(
                 }
             }
 
-            // 3. Subtle floating pending-settings pill when sheet is hidden (touch-passthrough)
+            // 3. Tappable pending-settings pill when sheet is hidden: tap to refresh & push old preview to history
             if (uiState.hasUnappliedChanges && !isSheetComposed) {
-                Box(
+                Surface(
+                    onClick = { onRefreshAfterSettingsChange() },
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.94f),
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    border = BorderStroke(
+                        width = 0.75.dp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                    ),
+                    shadowElevation = 4.dp,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(
-                            start = 24.dp,
-                            end = 24.dp,
+                            start = 16.dp,
+                            end = 16.dp,
                             bottom = navBarBottom + 56.dp
                         )
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f))
+                        .heightIn(min = 48.dp)
+                        .minimumInteractiveComponentSize()
                         .testTag("preview_pending_notice")
                 ) {
-                    Text(
-                        text = stringResource(R.string.preview_pending_changes_notice),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.preview_pending_changes_notice),
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 

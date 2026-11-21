@@ -328,12 +328,12 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("home_settings_sheet").assertDoesNotExist()
         composeTestRule.onNodeWithTag("preview_info_overlay").assertIsDisplayed()
         composeTestRule.onNodeWithTag("preview_pending_notice").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Settings updated · Tap here to refresh").assertIsDisplayed()
 
-        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
-            swipeLeft(startX = width * 0.85f, endX = width * 0.15f, durationMillis = 180L)
-        }
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
         awaitPreviewReady(viewModel, previousSeed = seedBeforePatternPick, requireAheadBuffer = true)
         assertEquals(ArtPattern.AMMANN_QUASICRYSTAL, viewModel.uiState.value.preview?.pattern)
+        assertEquals(seedBeforePatternPick, viewModel.uiState.value.previousPreview?.seed)
         composeTestRule.onNodeWithTag("preview_pending_notice").assertDoesNotExist()
 
         // 8. Open sheet via swipe up -> verify Palettes & Auto-Change controls -> Back hides sheet completely
@@ -1981,5 +1981,230 @@ class ExampleRobolectricTest {
             "Your Rp 159.000 tip is pending payment confirmation in Google Play.",
             billingVm.uiState.value.statusMessage
         )
+    }
+
+    @Test
+    fun tapToRefreshPendingNotice_appliesNewSettingsAndPushesOldPreviewToHistoryForSwipeRightComparison() {
+        composeTestRule.waitForIdle()
+        val activity = composeTestRule.activity
+        val viewModel = ViewModelProvider(
+            activity,
+            RimaluxViewModel.Factory(activity)
+        )[RimaluxViewModel::class.java]
+
+        awaitPreviewReady(viewModel, requireAheadBuffer = true)
+        if (viewModel.uiState.value.isGestureTutorialVisible) {
+            composeTestRule.onNodeWithTag("btn_dismiss_tutorial").performClick()
+            composeTestRule.waitForIdle()
+        }
+
+        // 1. Lock in an explicit "old settings" baseline wallpaper
+        viewModel.togglePatternSelection(ArtPattern.SILK_RIBBONS)
+        viewModel.updatePitchBlackRatio(0.45f)
+        awaitPreviewReady(viewModel, requireAheadBuffer = true)
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
+        awaitPreviewReady(viewModel, requireAheadBuffer = true)
+
+        val oldSnapshot = requireNotNull(viewModel.uiState.value.preview)
+        assertEquals(ArtPattern.SILK_RIBBONS, oldSnapshot.pattern)
+        assertEquals(0.45f, oldSnapshot.pitchBlackRatio, 0.01f)
+        composeTestRule.onNodeWithTag("preview_pending_notice").assertDoesNotExist()
+
+        // 2. Change settings (new pattern + new True Black ratio) while viewing the old wallpaper
+        viewModel.togglePatternSelection(ArtPattern.CHLADNI_CYMATICS)
+        viewModel.togglePatternSelection(ArtPattern.SILK_RIBBONS)
+        viewModel.updatePitchBlackRatio(0.90f)
+        awaitPreviewReady(viewModel, requireAheadBuffer = true)
+
+        assertTrue(viewModel.uiState.value.hasUnappliedChanges)
+        assertEquals(oldSnapshot.seed, viewModel.uiState.value.preview?.seed)
+        composeTestRule.onNodeWithTag("preview_pending_notice").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Settings updated · Tap here to refresh").assertIsDisplayed()
+
+        // Verify notice sits cleanly below preview_info_overlay with >= 48dp touch height
+        val noticeBounds = composeTestRule.onNodeWithTag("preview_pending_notice").fetchSemanticsNode().boundsInRoot
+        val infoBounds = composeTestRule.onNodeWithTag("preview_info_overlay").fetchSemanticsNode().boundsInRoot
+        val min48Px = 48f * activity.resources.displayMetrics.density
+        assertTrue(
+            "Tap-to-refresh pill height (${noticeBounds.height}) must be >= 48dp ($min48Px px)",
+            noticeBounds.height >= min48Px - 1f
+        )
+        assertTrue(
+            "preview_info_overlay (${infoBounds.bottom}) must stay cleanly above preview_pending_notice (${noticeBounds.top})",
+            infoBounds.bottom <= noticeBounds.top - 2f
+        )
+
+        // 3. Tap "Settings updated · Tap here to refresh" -> shows new-settings wallpaper & pushes old wallpaper to history
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
+        awaitPreviewReady(viewModel, previousSeed = oldSnapshot.seed, requireAheadBuffer = true)
+
+        val newSnapshot = requireNotNull(viewModel.uiState.value.preview)
+        assertNotEquals(oldSnapshot.seed, newSnapshot.seed)
+        assertEquals(oldSnapshot.geometrySeed, newSnapshot.geometrySeed)
+        assertEquals(ArtPattern.CHLADNI_CYMATICS, newSnapshot.pattern)
+        assertEquals(0.90f, newSnapshot.pitchBlackRatio, 0.01f)
+        // Unchanged settings (colors, color fill mode, pattern layout, intricacy) stay preserved!
+        assertEquals(oldSnapshot.colors, newSnapshot.colors)
+        assertEquals(oldSnapshot.colorFillMode, newSnapshot.colorFillMode)
+        assertEquals(oldSnapshot.patternWeightMode, newSnapshot.patternWeightMode)
+        assertEquals(oldSnapshot.intricacy, newSnapshot.intricacy, 0.0001f)
+        assertFalse(viewModel.uiState.value.hasUnappliedChanges)
+        composeTestRule.onNodeWithTag("preview_pending_notice").assertDoesNotExist()
+
+        assertTrue(viewModel.uiState.value.canSwipeRight)
+        assertEquals(oldSnapshot.seed, viewModel.uiState.value.previousPreview?.seed)
+        assertEquals(newSnapshot.seed, viewModel.uiState.value.history[0].seed)
+        assertEquals(oldSnapshot.seed, viewModel.uiState.value.history[1].seed)
+
+        // 4. Swipe right -> returns to old-settings wallpaper so user can compare previous vs new settings
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeRight(startX = width * 0.15f, endX = width * 0.85f, durationMillis = 180L)
+        }
+        awaitPreviewReady(viewModel, previousSeed = newSnapshot.seed, requireAheadBuffer = false)
+        val restoredOld = requireNotNull(viewModel.uiState.value.preview)
+        assertEquals(oldSnapshot.seed, restoredOld.seed)
+        assertEquals(ArtPattern.SILK_RIBBONS, restoredOld.pattern)
+        assertEquals(0.45f, restoredOld.pitchBlackRatio, 0.01f)
+        assertEquals(newSnapshot.seed, viewModel.uiState.value.nextPreview?.seed)
+
+        // 5. Swipe left -> moves right back forward to the new-settings wallpaper for A/B comparison
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeLeft(startX = width * 0.85f, endX = width * 0.15f, durationMillis = 180L)
+        }
+        awaitPreviewReady(viewModel, previousSeed = oldSnapshot.seed, requireAheadBuffer = false)
+        val restoredNew = requireNotNull(viewModel.uiState.value.preview)
+        assertEquals(newSnapshot.seed, restoredNew.seed)
+        assertEquals(ArtPattern.CHLADNI_CYMATICS, restoredNew.pattern)
+        assertEquals(0.90f, restoredNew.pitchBlackRatio, 0.01f)
+
+        // 6. Verify localized Indonesian string matches as well
+        val idCtx = com.cptodix.rimalux.oled.wallpaper.platform.AppLocaleManager.createLocalizedContext(
+            activity,
+            com.cptodix.rimalux.oled.wallpaper.model.AppLanguage.ID_ID
+        )
+        assertEquals(
+            "Setelan diperbarui · Ketuk di sini untuk segarkan",
+            idCtx.getString(R.string.preview_pending_changes_notice)
+        )
+    }
+
+    @Test
+    fun tapToRefresh_preservesCurrentWallpaperAndChangesOnlyEditedSettingAcrossAllSettingTypes() {
+        composeTestRule.waitForIdle()
+        val activity = composeTestRule.activity
+        val viewModel = ViewModelProvider(
+            activity,
+            RimaluxViewModel.Factory(activity)
+        )[RimaluxViewModel::class.java]
+
+        awaitPreviewReady(viewModel, requireAheadBuffer = true)
+        if (viewModel.uiState.value.isGestureTutorialVisible) {
+            composeTestRule.onNodeWithTag("btn_dismiss_tutorial").performClick()
+            composeTestRule.waitForIdle()
+        }
+
+        // Lock baseline with known settings
+        val initialSeed = requireNotNull(viewModel.uiState.value.preview).seed
+        val auroraPalette = viewModel.uiState.value.userPalettes.first { it.id == "obsidian_aurora" }
+        val goldPalette = viewModel.uiState.value.userPalettes.first { it.id == "imperial_gold" }
+        viewModel.togglePatternSelection(ArtPattern.SILK_RIBBONS)
+        viewModel.togglePaletteInList(auroraPalette)
+        viewModel.updatePitchBlackRatio(0.50f)
+        viewModel.setColorFillMode(ColorFillMode.GRADIENT)
+        viewModel.setPatternWeightMode(PatternWeightMode.NORMAL)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
+        awaitPreviewReady(viewModel, previousSeed = initialSeed)
+
+        val base = requireNotNull(viewModel.uiState.value.preview)
+        assertEquals(ArtPattern.SILK_RIBBONS, base.pattern)
+        assertEquals(auroraPalette.colors, base.colors)
+        assertEquals(0.50f, base.pitchBlackRatio, 0.01f)
+        assertEquals(ColorFillMode.GRADIENT, base.colorFillMode)
+        assertEquals(PatternWeightMode.NORMAL, base.patternWeightMode)
+
+        // 1. Change ONLY True Black Ratio -> keeps geometry, pattern, colors, fill, layout, intricacy
+        viewModel.updatePitchBlackRatio(0.88f)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
+        awaitPreviewReady(viewModel, previousSeed = base.seed)
+        val afterBlack = requireNotNull(viewModel.uiState.value.preview)
+        assertNotEquals(base.seed, afterBlack.seed)
+        assertEquals(base.geometrySeed, afterBlack.geometrySeed)
+        assertEquals(base.pattern, afterBlack.pattern)
+        assertEquals(base.colors, afterBlack.colors)
+        assertEquals(base.colorFillMode, afterBlack.colorFillMode)
+        assertEquals(base.patternWeightMode, afterBlack.patternWeightMode)
+        assertEquals(base.intricacy, afterBlack.intricacy, 0.0001f)
+        assertEquals(0.88f, afterBlack.pitchBlackRatio, 0.01f)
+        assertEquals(base.seed, viewModel.uiState.value.previousPreview?.seed)
+
+        // 2. Change ONLY Color Fill Style -> keeps geometry, pattern, colors, black ratio, layout, intricacy
+        viewModel.setColorFillMode(ColorFillMode.SOLID)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
+        awaitPreviewReady(viewModel, previousSeed = afterBlack.seed)
+        val afterFill = requireNotNull(viewModel.uiState.value.preview)
+        assertNotEquals(afterBlack.seed, afterFill.seed)
+        assertEquals(afterBlack.geometrySeed, afterFill.geometrySeed)
+        assertEquals(afterBlack.pattern, afterFill.pattern)
+        assertEquals(afterBlack.colors, afterFill.colors)
+        assertEquals(afterBlack.pitchBlackRatio, afterFill.pitchBlackRatio, 0.0001f)
+        assertEquals(afterBlack.patternWeightMode, afterFill.patternWeightMode)
+        assertEquals(afterBlack.intricacy, afterFill.intricacy, 0.0001f)
+        assertEquals(ColorFillMode.SOLID, afterFill.colorFillMode)
+
+        // 3. Change ONLY Palette -> keeps geometry, pattern, black ratio, fill, layout, intricacy
+        viewModel.togglePaletteInList(goldPalette)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
+        awaitPreviewReady(viewModel, previousSeed = afterFill.seed)
+        val afterPalette = requireNotNull(viewModel.uiState.value.preview)
+        assertNotEquals(afterFill.seed, afterPalette.seed)
+        assertEquals(afterFill.geometrySeed, afterPalette.geometrySeed)
+        assertEquals(afterFill.pattern, afterPalette.pattern)
+        assertEquals(goldPalette.colors, afterPalette.colors)
+        assertEquals(afterFill.pitchBlackRatio, afterPalette.pitchBlackRatio, 0.0001f)
+        assertEquals(afterFill.colorFillMode, afterPalette.colorFillMode)
+        assertEquals(afterFill.patternWeightMode, afterPalette.patternWeightMode)
+        assertEquals(afterFill.intricacy, afterPalette.intricacy, 0.0001f)
+
+        // 4. Change ONLY Pattern Layout -> keeps geometrySeed, pattern, colors, black ratio, fill, intricacy
+        viewModel.setPatternWeightMode(PatternWeightMode.CENTER_WEIGHTED)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
+        awaitPreviewReady(viewModel, previousSeed = afterPalette.seed)
+        val afterWeight = requireNotNull(viewModel.uiState.value.preview)
+        assertNotEquals(afterPalette.seed, afterWeight.seed)
+        assertEquals(afterPalette.geometrySeed, afterWeight.geometrySeed)
+        assertEquals(afterPalette.pattern, afterWeight.pattern)
+        assertEquals(afterPalette.colors, afterWeight.colors)
+        assertEquals(afterPalette.pitchBlackRatio, afterWeight.pitchBlackRatio, 0.0001f)
+        assertEquals(afterPalette.colorFillMode, afterWeight.colorFillMode)
+        assertEquals(PatternWeightMode.CENTER_WEIGHTED, afterWeight.patternWeightMode)
+        assertEquals(afterPalette.intricacy, afterWeight.intricacy, 0.0001f)
+
+        // 5. Change ONLY Pattern -> keeps geometrySeed, colors, black ratio, fill, layout, intricacy
+        viewModel.togglePatternSelection(ArtPattern.CHLADNI_CYMATICS)
+        viewModel.togglePatternSelection(ArtPattern.SILK_RIBBONS)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("preview_pending_notice").performClick()
+        awaitPreviewReady(viewModel, previousSeed = afterWeight.seed)
+        val afterPattern = requireNotNull(viewModel.uiState.value.preview)
+        assertNotEquals(afterWeight.seed, afterPattern.seed)
+        assertEquals(afterWeight.geometrySeed, afterPattern.geometrySeed)
+        assertEquals(ArtPattern.CHLADNI_CYMATICS, afterPattern.pattern)
+        assertEquals(afterWeight.colors, afterPattern.colors)
+        assertEquals(afterWeight.pitchBlackRatio, afterPattern.pitchBlackRatio, 0.0001f)
+        assertEquals(afterWeight.colorFillMode, afterPattern.colorFillMode)
+        assertEquals(afterWeight.patternWeightMode, afterPattern.patternWeightMode)
+        assertEquals(afterWeight.intricacy, afterPattern.intricacy, 0.0001f)
+
+        // Swiping right returns cleanly to the immediate prior variant (SILK_RIBBONS with same colors/black ratio)
+        composeTestRule.onNodeWithTag("vector_preview_canvas").performTouchInput {
+            swipeRight(startX = width * 0.15f, endX = width * 0.85f, durationMillis = 180L)
+        }
+        awaitPreviewReady(viewModel, previousSeed = afterPattern.seed)
+        assertEquals(afterWeight.seed, viewModel.uiState.value.preview?.seed)
     }
 }
