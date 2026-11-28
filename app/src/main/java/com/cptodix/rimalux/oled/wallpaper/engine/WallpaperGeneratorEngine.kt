@@ -185,4 +185,50 @@ object WallpaperGeneratorEngine {
         )
         return primary to secondary
     }
+
+    /**
+     * Controlled anti-repetition synthesis shared across interactive preview and background auto-change.
+     */
+    fun synthesizeControlled(
+        seed: Long,
+        spec: CoreGenerationSpec,
+        ledger: FreshnessLedger,
+        availablePalettes: List<ColorPalette> = StarterPalettes.defaults,
+        aspectRatio: Float = 2.15f,
+        explicitColors: List<Long>? = null,
+        excludePattern: ArtPattern? = null,
+        excludeColors: List<Long>? = null,
+        rng: Random = Random(seed xor 0x6A09E667F3BCC908L)
+    ): FreshnessSynthesisOutcome = ControlledFreshnessEngine.synthesizeControlled(
+        seed = seed,
+        spec = spec,
+        ledger = ledger,
+        availablePalettes = availablePalettes,
+        aspectRatio = aspectRatio,
+        explicitColors = explicitColors,
+        excludePattern = excludePattern,
+        excludeColors = excludeColors,
+        rng = rng
+    )
+
+    /**
+     * Controlled dual-target synthesis (Home Screen & Lock Screen) advancing the shared [FreshnessLedger].
+     */
+    fun synthesizeControlledPair(
+        primarySeed: Long,
+        secondarySeed: Long,
+        spec: CoreGenerationSpec,
+        ledger: FreshnessLedger,
+        availablePalettes: List<ColorPalette> = StarterPalettes.defaults,
+        aspectRatio: Float = 2.15f,
+        rng: Random = Random(primarySeed xor secondarySeed)
+    ): FreshnessPairOutcome = ControlledFreshnessEngine.synthesizeControlledPair(
+        primarySeed = primarySeed,
+        secondarySeed = secondarySeed,
+        spec = spec,
+        ledger = ledger,
+        availablePalettes = availablePalettes,
+        aspectRatio = aspectRatio,
+        rng = rng
+    )
 }

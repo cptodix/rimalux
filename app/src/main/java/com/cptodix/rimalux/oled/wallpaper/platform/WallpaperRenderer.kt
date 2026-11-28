@@ -37,7 +37,8 @@ sealed interface WallpaperApplyResult {
         val heightPx: Int,
         val densityDpi: Int,
         val measuredBlackPercent: Int,
-        val skippedAsDuplicate: Boolean = false
+        val skippedAsDuplicate: Boolean = false,
+        val skippedWhileAsleep: Boolean = false
     ) : WallpaperApplyResult
 
     data class Error(val reason: String) : WallpaperApplyResult

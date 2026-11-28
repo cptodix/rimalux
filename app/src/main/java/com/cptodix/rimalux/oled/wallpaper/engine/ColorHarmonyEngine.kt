@@ -171,55 +171,107 @@ object ColorHarmonyEngine {
 }
 
 object RandomPaletteGenerator {
+    const val HARMONY_COUNT: Int = 10
+
     /**
-     * Synthesizes harmonious, vibrant designer palettes using 8 HSV color-theory rules
+     * Synthesizes harmonious, vibrant designer palettes using 10 HSV color-theory & mood rules
      * in pure Kotlin math. Never outputs `#000000` or near-black colors.
      */
     fun generate(seed: Long): List<Long> {
         val rng = Random(seed)
-        val swatchCount = 4 + rng.nextInt(3) // 4 to 6 swatches
         val baseHue = rng.nextFloat() * 360f
-        val harmonyType = rng.nextInt(8)
+        val harmonyType = rng.nextInt(HARMONY_COUNT)
+        return generateControlled(
+            seed = seed,
+            harmonyType = harmonyType,
+            baseHueDeg = baseHue
+        )
+    }
+
+    /**
+     * Deterministic palette synthesis given an explicit [harmonyType] and [baseHueDeg], allowing
+     * [ControlledFreshnessEngine] to prevent consecutive harmony & hue-sector clustering.
+     */
+    fun generateControlled(
+        seed: Long,
+        harmonyType: Int,
+        baseHueDeg: Float
+    ): List<Long> {
+        val rng = Random(seed)
+        val safeHarmony = harmonyType.mod(HARMONY_COUNT)
+        val baseHue = ((baseHueDeg % 360f) + 360f) % 360f
+        val swatchCount = 4 + rng.nextInt(3) // 4 to 6 swatches
 
         val colors = ArrayList<Long>(swatchCount)
         for (i in 0 until swatchCount) {
-            val hue = when (harmonyType) {
+            val hue = when (safeHarmony) {
                 // 0: Smooth analogous sweep
                 0 -> (baseHue + i * 24f) % 360f
                 // 1: Split-complementary
                 1 -> {
-                    val offsets = floatArrayOf(0f, 22f, 155f, 205f, 338f, 180f)
+                    val offsets = floatArrayOf(0f, 24f, 152f, 206f, 336f, 180f)
                     (baseHue + offsets[i % offsets.size]) % 360f
                 }
                 // 2: Triadic chord
                 2 -> (baseHue + (i % 3) * 120f + (i / 3) * 20f) % 360f
                 // 3: Tetradic rectangle
                 3 -> {
-                    val offsets = floatArrayOf(0f, 60f, 180f, 240f, 30f, 210f)
+                    val offsets = floatArrayOf(0f, 62f, 180f, 242f, 30f, 210f)
                     (baseHue + offsets[i % offsets.size]) % 360f
                 }
                 // 4: Golden-angle hue spiral
                 4 -> (baseHue + i * 137.508f) % 360f
-                // 5: Warm-cool cinematic contrast
-                5 -> if (i % 2 == 0) (20f + rng.nextFloat() * 32f) else (188f + rng.nextFloat() * 35f)
-                // 6: Pastel-luxe high brightness
-                6 -> (baseHue + i * 48f) % 360f
-                // 7: Analogous + complementary accent
-                else -> {
+                // 5: Rotated warm-cool editorial duotone (pivots cleanly with baseHue)
+                5 -> {
+                    val opposeHue = (baseHue + 166f) % 360f
+                    if (i % 2 == 0) (baseHue + (i / 2) * 16f) % 360f
+                    else (opposeHue + (i / 2) * 18f) % 360f
+                }
+                // 6: Luminous mineral / pastel silk
+                6 -> (baseHue + i * 44f) % 360f
+                // 7: Analogous + crisp complement pop
+                7 -> {
                     if (i < swatchCount - 1) (baseHue + i * 18f) % 360f
                     else (baseHue + 180f) % 360f
                 }
+                // 8: Tonal monochromatic + airy ivory/pearl highlight
+                8 -> (baseHue + (i - 1) * 7f + 360f) % 360f
+                // 9: Nocturnal jewel & champagne accent
+                else -> when (i) {
+                    swatchCount - 1 -> 42f // Warm champagne-gold accent
+                    swatchCount - 2 -> (baseHue + 34f) % 360f
+                    else -> (baseHue + i * 15f) % 360f
+                }
             }
 
-            val saturation = if (harmonyType == 6) {
-                (0.32f + rng.nextFloat() * 0.26f).coerceIn(0.30f, 0.60f)
-            } else {
-                (0.55f + rng.nextFloat() * 0.38f).coerceIn(0.46f, 0.95f)
+            val saturation = when (safeHarmony) {
+                6 -> (0.28f + rng.nextFloat() * 0.24f).coerceIn(0.24f, 0.54f)
+                8 -> when (i) {
+                    0 -> 0.08f + rng.nextFloat() * 0.12f
+                    1 -> 0.28f + rng.nextFloat() * 0.18f
+                    else -> 0.52f + rng.nextFloat() * 0.34f
+                }
+                9 -> if (i == swatchCount - 1) {
+                    (0.30f + rng.nextFloat() * 0.22f)
+                } else {
+                    (0.58f + rng.nextFloat() * 0.30f).coerceIn(0.50f, 0.90f)
+                }
+                else -> (0.54f + rng.nextFloat() * 0.36f).coerceIn(0.46f, 0.92f)
             }
-            val value = if (harmonyType == 6) {
-                (0.92f + rng.nextFloat() * 0.08f).coerceIn(0.90f, 1.0f)
-            } else {
-                (0.80f + rng.nextFloat() * 0.20f).coerceIn(0.76f, 1.0f)
+
+            val value = when (safeHarmony) {
+                6 -> (0.90f + rng.nextFloat() * 0.09f).coerceIn(0.88f, 1.0f)
+                8 -> when (i) {
+                    0 -> 0.94f + rng.nextFloat() * 0.06f
+                    swatchCount - 1 -> 0.56f + rng.nextFloat() * 0.20f
+                    else -> 0.74f + rng.nextFloat() * 0.22f
+                }
+                9 -> if (i == swatchCount - 1) {
+                    0.96f
+                } else {
+                    (0.68f + rng.nextFloat() * 0.28f).coerceIn(0.64f, 0.96f)
+                }
+                else -> (0.78f + rng.nextFloat() * 0.22f).coerceIn(0.74f, 1.0f)
             }
             colors.add(ColorHarmonyEngine.hsvToArgbLong(hue, saturation, value))
         }

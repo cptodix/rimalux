@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.PowerManager
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -11,6 +12,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.cptodix.rimalux.oled.wallpaper.data.WallpaperPreferencesRepository
+import com.cptodix.rimalux.oled.wallpaper.engine.FreshnessLedger
 import com.cptodix.rimalux.oled.wallpaper.engine.WallpaperGeneratorEngine
 import com.cptodix.rimalux.oled.wallpaper.model.GeneratedHistoryItem
 import com.cptodix.rimalux.oled.wallpaper.model.WallpaperTarget
@@ -267,6 +269,24 @@ object WallpaperScheduler {
     }
 
 
+    internal fun isDeviceInteractive(context: Context): Boolean {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        return powerManager?.isInteractive ?: true
+    }
+
+    internal fun isDeviceIdleDoze(context: Context): Boolean {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        return powerManager?.isDeviceIdleMode ?: false
+    }
+
+    internal fun computeMaxConsecutiveAsleepSkips(intervalMinutes: Int, isDozeIdle: Boolean): Int {
+        return when {
+            intervalMinutes <= 30 -> if (isDozeIdle) 7 else 3
+            intervalMinutes <= 90 -> if (isDozeIdle) 2 else 1
+            else -> 0
+        }
+    }
+
     suspend fun executeAutoRotationCycle(
         context: Context,
         wasScheduled: Boolean,
@@ -280,6 +300,10 @@ object WallpaperScheduler {
             val config = snapshot.config
             val safeMinutes = config.intervalMinutes.coerceIn(1, 10080)
             val intervalMillis = safeMinutes * 60_000L
+
+            val interactiveNow = isDeviceInteractive(appContext)
+            val dozeIdleNow = !interactiveNow && isDeviceIdleDoze(appContext)
+            val maxAsleepSkips = computeMaxConsecutiveAsleepSkips(safeMinutes, dozeIdleNow)
 
             if (wasScheduled && !force) {
                 if (!config.autoRotateEnabled) {
@@ -313,6 +337,31 @@ object WallpaperScheduler {
                         skippedAsDuplicate = true
                     )
                 }
+
+                // Sleep-window protection for fast intervals (e.g., 15m overnight):
+                // Allow the first screen-off rotation so picking up the phone reveals a fresh wallpaper,
+                // then pace subsequent unseen screen-off intervals so patterns/palettes aren't burned overnight.
+                if (!interactiveNow && maxAsleepSkips > 0 && snapshot.asleepCycleCounter in 1..maxAsleepSkips) {
+                    val nextMillis = scheduleNext(
+                        context = appContext,
+                        intervalMinutes = safeMinutes,
+                        fromRunningWorker = fromRunningWorker
+                    )
+                    repository.recordAsleepSkipAtomically(
+                        nextRunEpochMillis = nextMillis,
+                        nextAsleepCycleCounter = snapshot.asleepCycleCounter + 1
+                    )
+                    val spec = WallpaperRenderer.getTargetWallpaperSpec(appContext)
+                    val cachedRatio = snapshot.currentPitchBlackRatio ?: config.pitchBlackRatio
+                    return@withLock WallpaperApplyResult.Success(
+                        widthPx = spec.widthPx,
+                        heightPx = spec.heightPx,
+                        densityDpi = spec.densityDpi,
+                        measuredBlackPercent = (cachedRatio * 100f).toInt(),
+                        skippedAsDuplicate = false,
+                        skippedWhileAsleep = true
+                    )
+                }
             }
 
             val rng = Random(System.nanoTime() xor System.currentTimeMillis() xor snapshot.currentSeed)
@@ -327,6 +376,7 @@ object WallpaperScheduler {
 
             val nowMillis = maxOf(System.currentTimeMillis(), snapshot.lastAutoExecMillis + 1L)
             val homeSynthesized: com.cptodix.rimalux.oled.wallpaper.engine.SynthesizedWallpaper
+            val updatedLedger: FreshnessLedger
             var lockHistoryItem: GeneratedHistoryItem? = null
 
             val applyResult = if (config.autoTarget == WallpaperTarget.BOTH_SEPARATE) {
@@ -334,21 +384,24 @@ object WallpaperScheduler {
                     rng = rng,
                     excludedSeeds = setOf(0L, snapshot.currentSeed, homeSeed)
                 )
-                val (homeGen, lockGen) = WallpaperGeneratorEngine.synthesizeDistinctPair(
+                val pairOutcome = WallpaperGeneratorEngine.synthesizeControlledPair(
                     primarySeed = homeSeed,
                     secondarySeed = lockSeed,
                     spec = coreSpec,
+                    ledger = snapshot.freshnessLedger,
                     availablePalettes = snapshot.userPalettes,
                     aspectRatio = aspect,
                     rng = rng
                 )
-                homeSynthesized = homeGen
+                homeSynthesized = pairOutcome.primary
+                val lockGen = pairOutcome.secondary
+                updatedLedger = pairOutcome.updatedLedger
 
                 val res = WallpaperRenderer.applySeparateWallpapersToSystem(
                     context = appContext,
-                    homeScene = homeGen.scene,
-                    homePaletteColors = homeGen.paletteColors,
-                    homePitchBlackRatio = homeGen.pitchBlackRatio,
+                    homeScene = homeSynthesized.scene,
+                    homePaletteColors = homeSynthesized.paletteColors,
+                    homePitchBlackRatio = homeSynthesized.pitchBlackRatio,
                     lockScene = lockGen.scene,
                     lockPaletteColors = lockGen.paletteColors,
                     lockPitchBlackRatio = lockGen.pitchBlackRatio,
@@ -369,15 +422,17 @@ object WallpaperScheduler {
                 )
                 res
             } else {
-                homeSynthesized = WallpaperGeneratorEngine.synthesize(
+                val outcome = WallpaperGeneratorEngine.synthesizeControlled(
                     seed = homeSeed,
                     spec = coreSpec,
+                    ledger = snapshot.freshnessLedger,
                     availablePalettes = snapshot.userPalettes,
                     aspectRatio = aspect,
-                    paletteRng = rng,
-                    ratioRng = rng,
-                    intricacyOverride = WallpaperGeneratorEngine.sampleIntricacy(rng)
+                    rng = rng
                 )
+                homeSynthesized = outcome.wallpaper
+                updatedLedger = outcome.updatedLedger
+
                 WallpaperRenderer.applyWallpaperToSystem(
                     context = appContext,
                     scene = homeSynthesized.scene,
@@ -398,6 +453,12 @@ object WallpaperScheduler {
                 null
             }
 
+            val nextAsleepCounter = if (wasScheduled && !force && !interactiveNow && maxAsleepSkips > 0) {
+                1
+            } else {
+                0
+            }
+
             val homeHistoryItem = GeneratedHistoryItem(
                 id = "gen_${nowMillis}_${homeSynthesized.seed.toString(16)}",
                 seed = homeSynthesized.seed,
@@ -413,7 +474,9 @@ object WallpaperScheduler {
             repository.recordAutoRotationAtomically(
                 primaryItem = homeHistoryItem,
                 secondaryHistoryItem = lockHistoryItem,
-                nextRunEpochMillis = nextMillis
+                nextRunEpochMillis = nextMillis,
+                freshnessLedger = updatedLedger,
+                asleepCycleCounter = nextAsleepCounter
             )
 
             applyResult

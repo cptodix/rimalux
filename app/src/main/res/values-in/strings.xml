@@ -521,4 +521,19 @@
     <string name="palette_name_lunar_frost">Embun Beku Bulan</string>
     <string name="palette_name_obsidian_ember">Bara Obsidian</string>
     <string name="palette_name_blackfire_opal">Opal Api Hitam</string>
+    <string name="palette_name_obsidian_jade">Beludru Giok</string>
+    <string name="palette_name_cobalt_vermilion">Kobalt &amp; Vermilion</string>
+    <string name="palette_name_sunlit_coral">Koral Mentari</string>
+    <string name="palette_name_kyoto_moss">Lumut Kyoto</string>
+    <string name="palette_name_amalfi_azure">Biru Amalfi</string>
+    <string name="palette_name_burgundy_champagne">Bordeaux Beludru</string>
+    <string name="palette_name_lagoon_mint">Angin Laguna</string>
+    <string name="palette_name_tangerine_dusk">Senja Keprok</string>
+    <string name="palette_name_iridescent_pearl">Mutiara Pelangi</string>
+    <string name="palette_name_forest_fern">Kanopi Zamrud</string>
+    <string name="palette_name_indigo_silk">Indigo Tengah Malam</string>
+    <string name="palette_name_honey_ember">Saffron &amp; Madu</string>
+    <string name="palette_name_neon_botanica">Flora Prisma</string>
+    <string name="palette_name_espresso_cream">Kopi &amp; Gading</string>
+    <string name="palette_name_violet_citrus">Anggrek &amp; Yuzu</string>
 </resources>

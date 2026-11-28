@@ -13,7 +13,9 @@ import androidx.lifecycle.viewModelScope
 import com.cptodix.rimalux.oled.wallpaper.R
 import com.cptodix.rimalux.oled.wallpaper.data.WallpaperPreferencesRepository
 import com.cptodix.rimalux.oled.wallpaper.engine.ColorHarmonyEngine
+import com.cptodix.rimalux.oled.wallpaper.engine.ControlledFreshnessEngine
 import com.cptodix.rimalux.oled.wallpaper.engine.DeepBlackRatioEngine
+import com.cptodix.rimalux.oled.wallpaper.engine.FreshnessLedger
 import com.cptodix.rimalux.oled.wallpaper.engine.MathPatternGenerator
 import com.cptodix.rimalux.oled.wallpaper.engine.SceneRatioStats
 import com.cptodix.rimalux.oled.wallpaper.engine.SynthesizedWallpaper
@@ -198,6 +200,8 @@ class RimaluxViewModel(
     private val pendingGestureWrites = EnumMap<StudioGestureAction, Long>(StudioGestureAction::class.java)
     private var lastObservedAutoExecMillis = 0L
     private var isExecutingScheduledTick = false
+    private var workingLedger = FreshnessLedger()
+    private val stagedLedgersBySeed = HashMap<Long, FreshnessLedger>()
     private data class PendingSettingChanges(
         val patternChanged: Boolean = false,
         val patternWeightChanged: Boolean = false,
@@ -229,6 +233,10 @@ class RimaluxViewModel(
                 if (!hasInitializedFromStorage) {
                     hasInitializedFromStorage = true
                     lastObservedAutoExecMillis = stored.lastAutoExecMillis
+                    workingLedger = stored.freshnessLedger
+                    if (stored.asleepCycleCounter != 0 && WallpaperScheduler.isDeviceInteractive(appContext)) {
+                        viewModelScope.launch { repository.resetAsleepCycleCounter() }
+                    }
 
                     pastStack.clear()
                     if (stored.currentSeed != 0L && stored.history.isNotEmpty()) {
@@ -318,6 +326,14 @@ class RimaluxViewModel(
                             geometrySeed = stored.currentGeometrySeed ?: stored.currentSeed
                         )
                         renderedCache[rendered.seed] = rendered
+                        if (workingLedger.recentPatternIds.isEmpty()) {
+                            workingLedger = ControlledFreshnessEngine.recordManualSelection(
+                                ledger = workingLedger,
+                                pattern = patternToUse,
+                                colors = colorsToUse,
+                                intricacy = effectiveIntricacy
+                            )
+                        }
                         _uiState.update { state ->
                             state.copy(
                                 preview = rendered,
@@ -337,6 +353,7 @@ class RimaluxViewModel(
 
                 if (autoTickOccurred) {
                     lastObservedAutoExecMillis = stored.lastAutoExecMillis
+                    workingLedger = stored.freshnessLedger
                     val previousActive = _uiState.value.preview
                     if (previousActive != null && pastStack.lastOrNull()?.seed != previousActive.seed) {
                         pushPastItem(previousActive.toHistoryItem())
@@ -391,7 +408,7 @@ class RimaluxViewModel(
                             )
                         )
                     }
-                    ensureDeckPrefetchIfIdle()
+                    invalidateAheadAndPrefetch(debounceMs = 0L)
                 } else {
                     val resolvedTimestamps = StudioGestureAction.entries.associateWith { action ->
                         pendingGestureWrites[action] ?: (stored.lastGestureTimestamps[action] ?: 0L)
@@ -440,10 +457,12 @@ class RimaluxViewModel(
     private fun persistActiveDeck(active: RenderedPreviewSnapshot) {
         val currentItem = active.toHistoryItem(wasAutoScheduled = false)
         val pastNewestFirst = pastStack.asReversed().toList()
+        val ledgerSnapshot = workingLedger
         viewModelScope.launch {
             repository.saveTimelineState(
                 current = currentItem,
-                pastNewestFirst = pastNewestFirst
+                pastNewestFirst = pastNewestFirst,
+                freshnessLedger = ledgerSnapshot
             )
         }
     }
@@ -468,20 +487,23 @@ class RimaluxViewModel(
         seed: Long,
         config: GeneratorConfig,
         userPalettes: List<ColorPalette>,
-        explicitRandomColors: List<Long>?
-    ): RenderedPreviewSnapshot = withContext(Dispatchers.Default) {
-        val synthesized = WallpaperGeneratorEngine.synthesize(
+        explicitRandomColors: List<Long>?,
+        baseLedger: FreshnessLedger
+    ): Pair<RenderedPreviewSnapshot, FreshnessLedger> = withContext(Dispatchers.Default) {
+        val outcome = WallpaperGeneratorEngine.synthesizeControlled(
             seed = seed,
             spec = config.toCoreSpec(),
+            ledger = baseLedger,
             availablePalettes = userPalettes,
             aspectRatio = screenAspect,
             explicitColors = if (config.paletteMode == PaletteMode.RANDOMIZED) explicitRandomColors else null
         )
-        rasterizeSynthesizedPreview(synthesized)
+        rasterizeSynthesizedPreview(outcome.wallpaper) to outcome.updatedLedger
     }
 
     private fun invalidateAheadAndPrefetch(debounceMs: Long = 0L) {
         prefetchEpoch += 1L
+        aheadQueue.forEach { stagedLedgersBySeed.remove(it.seed) }
         aheadQueue.clear()
         _uiState.update {
             it.copy(
@@ -514,21 +536,27 @@ class RimaluxViewModel(
             }
             if (capturedEpoch != prefetchEpoch) return@launch
 
+            var cursorLedger = aheadQueue.lastOrNull()?.seed?.let { stagedLedgersBySeed[it] } ?: workingLedger
+
             // 1. If active preview slot is empty (initial launch or user swiped ahead of buffer), synthesize immediately
             if (_uiState.value.preview == null) {
                 val snap = _uiState.value
                 val seed = nextUniqueSeed()
                 val explicitRandom = pendingRandomColors
                 pendingRandomColors = null
-                val rendered = synthesizeForConfig(
+                val (rendered, nextLedger) = synthesizeForConfig(
                     seed = seed,
                     config = snap.config,
                     userPalettes = snap.userPalettes,
-                    explicitRandomColors = explicitRandom
+                    explicitRandomColors = explicitRandom,
+                    baseLedger = cursorLedger
                 )
                 if (capturedEpoch != prefetchEpoch) return@launch
                 renderedCache[rendered.seed] = rendered
+                stagedLedgersBySeed[rendered.seed] = nextLedger
+                cursorLedger = nextLedger
                 if (_uiState.value.preview == null) {
+                    workingLedger = nextLedger
                     val updatedHistory = buildCurrentHistoryList(rendered)
                     _uiState.update { state ->
                         state.copy(
@@ -576,17 +604,21 @@ class RimaluxViewModel(
                 val seed = nextUniqueSeed()
                 val explicitRandom = pendingRandomColors
                 pendingRandomColors = null
-                val renderedNext = synthesizeForConfig(
+                val (renderedNext, nextLedger) = synthesizeForConfig(
                     seed = seed,
                     config = snap.config,
                     userPalettes = snap.userPalettes,
-                    explicitRandomColors = explicitRandom
+                    explicitRandomColors = explicitRandom,
+                    baseLedger = cursorLedger
                 )
                 if (capturedEpoch != prefetchEpoch) return@launch
                 renderedCache[renderedNext.seed] = renderedNext
+                stagedLedgersBySeed[renderedNext.seed] = nextLedger
+                cursorLedger = nextLedger
 
                 // If user swiped left onto loading slot while we were rendering, promote directly to active preview
                 if (_uiState.value.preview == null) {
+                    workingLedger = nextLedger
                     val updatedHistory = buildCurrentHistoryList(renderedNext)
                     _uiState.update { state ->
                         state.copy(
@@ -659,34 +691,52 @@ class RimaluxViewModel(
         } else if (!config.patternsRandomized) {
             val pool = config.selectedPatterns
             when {
-                pool.isEmpty() -> MathPatternGenerator.resolvePatternForSeed(
-                    seed = newSeed,
-                    patternsRandomized = true,
-                    selectedPatterns = pool,
-                    excludePattern = active.pattern
-                )
+                pool.isEmpty() -> {
+                    val (picked, nextLedger) = ControlledFreshnessEngine.pickNextPattern(
+                        rng = Random(newSeed xor 0x6A09E667F3BCC908L),
+                        patternsRandomized = true,
+                        selectedPatterns = pool,
+                        ledger = workingLedger,
+                        excludePattern = active.pattern
+                    )
+                    workingLedger = nextLedger
+                    picked
+                }
                 pool.size == 1 -> pool.first()
                 pickedPatternHint != null && pickedPatternHint in pool && pickedPatternHint != active.pattern ->
                     pickedPatternHint
-                active.pattern !in pool -> MathPatternGenerator.resolvePatternForSeed(
-                    seed = newSeed,
-                    patternsRandomized = false,
-                    selectedPatterns = pool
-                )
-                else -> MathPatternGenerator.resolvePatternForSeed(
-                    seed = newSeed,
-                    patternsRandomized = false,
-                    selectedPatterns = pool,
-                    excludePattern = active.pattern
-                )
+                active.pattern !in pool -> {
+                    val (picked, nextLedger) = ControlledFreshnessEngine.pickNextPattern(
+                        rng = Random(newSeed xor 0x6A09E667F3BCC908L),
+                        patternsRandomized = false,
+                        selectedPatterns = pool,
+                        ledger = workingLedger
+                    )
+                    workingLedger = nextLedger
+                    picked
+                }
+                else -> {
+                    val (picked, nextLedger) = ControlledFreshnessEngine.pickNextPattern(
+                        rng = Random(newSeed xor 0x6A09E667F3BCC908L),
+                        patternsRandomized = false,
+                        selectedPatterns = pool,
+                        ledger = workingLedger,
+                        excludePattern = active.pattern
+                    )
+                    workingLedger = nextLedger
+                    picked
+                }
             }
         } else {
-            MathPatternGenerator.resolvePatternForSeed(
-                seed = newSeed,
+            val (picked, nextLedger) = ControlledFreshnessEngine.pickNextPattern(
+                rng = Random(newSeed xor 0x6A09E667F3BCC908L),
                 patternsRandomized = true,
                 selectedPatterns = config.selectedPatterns,
+                ledger = workingLedger,
                 excludePattern = active.pattern
             )
+            workingLedger = nextLedger
+            picked
         }
 
         val resolvedWeightMode = if (changes.patternWeightChanged) {
@@ -706,39 +756,50 @@ class RimaluxViewModel(
         } else {
             when (config.paletteMode) {
                 PaletteMode.RANDOMIZED -> {
-                    explicitRandomColors?.takeIf { it.isNotEmpty() }
+                    val picked = explicitRandomColors?.takeIf { it.isNotEmpty() }
                         ?: currentSnapshot.stagedColors.takeIf { it.isNotEmpty() && it != active.colors }
-                        ?: ColorHarmonyEngine.selectColorsForSeed(
+                    if (picked != null) {
+                        picked
+                    } else {
+                        val (nextCols, nextLedger) = ControlledFreshnessEngine.pickNextColors(
                             seed = newSeed,
+                            rng = Random(newSeed xor 0x6A09E667F3BCC908L),
                             paletteMode = PaletteMode.RANDOMIZED,
                             selectedPaletteIds = emptySet(),
                             availablePalettes = userPalettes,
+                            ledger = workingLedger,
                             excludeColors = active.colors
                         )
+                        workingLedger = nextLedger
+                        nextCols
+                    }
                 }
                 PaletteMode.PALETTE_LIST -> {
                     val staged = currentSnapshot.stagedColors
                     if (staged.isNotEmpty() && staged != active.colors) {
                         staged
-                    } else if (config.selectedPaletteIds.size > 1) {
-                        ColorHarmonyEngine.selectColorsForSeed(
+                    } else {
+                        val (nextCols, nextLedger) = ControlledFreshnessEngine.pickNextColors(
                             seed = newSeed,
+                            rng = Random(newSeed xor 0x6A09E667F3BCC908L),
                             paletteMode = PaletteMode.PALETTE_LIST,
                             selectedPaletteIds = config.selectedPaletteIds,
                             availablePalettes = userPalettes,
-                            excludeColors = active.colors
+                            ledger = workingLedger,
+                            excludeColors = if (config.selectedPaletteIds.size > 1) active.colors else null
                         )
-                    } else {
-                        ColorHarmonyEngine.selectColorsForSeed(
-                            seed = newSeed,
-                            paletteMode = PaletteMode.PALETTE_LIST,
-                            selectedPaletteIds = config.selectedPaletteIds,
-                            availablePalettes = userPalettes
-                        )
+                        workingLedger = nextLedger
+                        nextCols
                     }
                 }
             }
         }
+        workingLedger = ControlledFreshnessEngine.recordManualSelection(
+            ledger = workingLedger,
+            pattern = resolvedPattern,
+            colors = resolvedColors,
+            intricacy = keptIntricacy
+        )
 
         val resolvedBlackRatio: Float = if (!changes.pitchBlackChanged) {
             active.pitchBlackRatio
@@ -869,6 +930,9 @@ class RimaluxViewModel(
         val readyNext = aheadQueue.removeFirstOrNull()
         if (readyNext != null) {
             renderedCache[readyNext.seed] = readyNext
+            stagedLedgersBySeed.remove(readyNext.seed)?.let { promotedLedger ->
+                workingLedger = promotedLedger
+            }
             val updatedHistory = buildCurrentHistoryList(readyNext)
             _uiState.update { state ->
                 state.copy(
@@ -1036,7 +1100,7 @@ class RimaluxViewModel(
                                 force = false,
                                 fromRunningWorker = false
                             )
-                            if (result is WallpaperApplyResult.Success && !result.skippedAsDuplicate) {
+                            if (result is WallpaperApplyResult.Success && !result.skippedAsDuplicate && !result.skippedWhileAsleep) {
                                 val locCtx = localizedContext
                                 postStatus(
                                     locCtx.getString(
@@ -1364,16 +1428,20 @@ class RimaluxViewModel(
                     rng = rng,
                     excludedSeeds = setOf(0L, preview.seed)
                 )
-                val lockGen = withContext(Dispatchers.Default) {
-                    WallpaperGeneratorEngine.synthesize(
+                val lockOutcome = withContext(Dispatchers.Default) {
+                    WallpaperGeneratorEngine.synthesizeControlled(
                         seed = lockSeed,
                         spec = cfg.toCoreSpec(),
+                        ledger = workingLedger,
                         availablePalettes = palettes,
                         aspectRatio = screenAspect,
                         excludePattern = preview.pattern,
                         excludeColors = preview.colors
                     )
                 }
+                val lockGen = lockOutcome.wallpaper
+                workingLedger = lockOutcome.updatedLedger
+                repository.saveFreshnessLedger(workingLedger)
 
                 val applyRes = WallpaperRenderer.applySeparateWallpapersToSystem(
                     context = appContext,
@@ -1713,7 +1781,17 @@ class RimaluxViewModel(
         if (current.config.paletteMode == mode) return
         val nextStagedColors = when (mode) {
             PaletteMode.RANDOMIZED -> {
-                val fresh = RandomPaletteGenerator.generate(System.nanoTime())
+                val seed = System.nanoTime() xor (current.preview?.seed ?: 0x5F3759DFL)
+                val (fresh, nextLedger) = ControlledFreshnessEngine.pickNextColors(
+                    seed = seed,
+                    rng = Random(seed),
+                    paletteMode = PaletteMode.RANDOMIZED,
+                    selectedPaletteIds = emptySet(),
+                    availablePalettes = current.userPalettes,
+                    ledger = workingLedger,
+                    excludeColors = current.preview?.colors
+                )
+                workingLedger = nextLedger
                 pendingRandomColors = fresh
                 fresh
             }
@@ -1739,7 +1817,17 @@ class RimaluxViewModel(
 
     fun shuffleRandomColors() {
         val baseSeed = _uiState.value.preview?.seed ?: 0x5F3759DFL
-        val freshColors = RandomPaletteGenerator.generate(System.nanoTime() xor baseSeed)
+        val shuffleSeed = System.nanoTime() xor baseSeed
+        val (freshColors, nextLedger) = ControlledFreshnessEngine.pickNextColors(
+            seed = shuffleSeed,
+            rng = Random(shuffleSeed),
+            paletteMode = PaletteMode.RANDOMIZED,
+            selectedPaletteIds = emptySet(),
+            availablePalettes = _uiState.value.userPalettes,
+            ledger = workingLedger,
+            excludeColors = _uiState.value.stagedColors
+        )
+        workingLedger = nextLedger
         pendingRandomColors = freshColors
         pendingSettingChanges = pendingSettingChanges.copy(paletteChanged = true)
         _uiState.update {
@@ -1750,6 +1838,7 @@ class RimaluxViewModel(
             )
         }
         persistConfigChanges(debounceMs = 0L)
+        viewModelScope.launch { repository.saveFreshnessLedger(nextLedger) }
         invalidateAheadAndPrefetch(debounceMs = 0L)
     }
 
@@ -1904,12 +1993,18 @@ class RimaluxViewModel(
     fun ensureAutoScheduleIfEnabled() {
         if (!hasInitializedFromStorage) return
         viewModelScope.launch {
+            if (WallpaperScheduler.isDeviceInteractive(appContext)) {
+                repository.resetAsleepCycleCounter()
+            }
             ensureAutoScheduleInternal(_uiState.value.config)
         }
     }
 
     fun onAppResumed() {
         viewModelScope.launch {
+            if (WallpaperScheduler.isDeviceInteractive(appContext)) {
+                repository.resetAsleepCycleCounter()
+            }
             billingController.refreshCatalogAndPendingPurchases()
         }
     }

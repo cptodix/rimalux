@@ -329,6 +329,21 @@ val ColorPalette.nameResOrNull: Int?
         "lunar_frost" -> R.string.palette_name_lunar_frost
         "obsidian_ember" -> R.string.palette_name_obsidian_ember
         "blackfire_opal" -> R.string.palette_name_blackfire_opal
+        "obsidian_jade" -> R.string.palette_name_obsidian_jade
+        "cobalt_vermilion" -> R.string.palette_name_cobalt_vermilion
+        "sunlit_coral" -> R.string.palette_name_sunlit_coral
+        "kyoto_moss" -> R.string.palette_name_kyoto_moss
+        "amalfi_azure" -> R.string.palette_name_amalfi_azure
+        "burgundy_champagne" -> R.string.palette_name_burgundy_champagne
+        "lagoon_mint" -> R.string.palette_name_lagoon_mint
+        "tangerine_dusk" -> R.string.palette_name_tangerine_dusk
+        "iridescent_pearl" -> R.string.palette_name_iridescent_pearl
+        "forest_fern" -> R.string.palette_name_forest_fern
+        "indigo_silk" -> R.string.palette_name_indigo_silk
+        "honey_ember" -> R.string.palette_name_honey_ember
+        "neon_botanica" -> R.string.palette_name_neon_botanica
+        "espresso_cream" -> R.string.palette_name_espresso_cream
+        "violet_citrus" -> R.string.palette_name_violet_citrus
         else -> null
     }
 

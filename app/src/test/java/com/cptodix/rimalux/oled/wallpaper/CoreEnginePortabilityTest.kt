@@ -4,7 +4,9 @@ import com.cptodix.rimalux.oled.wallpaper.engine.ArtPattern
 import com.cptodix.rimalux.oled.wallpaper.engine.ColorFillMode
 import com.cptodix.rimalux.oled.wallpaper.engine.ColorHarmonyEngine
 import com.cptodix.rimalux.oled.wallpaper.engine.CoreGenerationSpec
+import com.cptodix.rimalux.oled.wallpaper.engine.ControlledFreshnessEngine
 import com.cptodix.rimalux.oled.wallpaper.engine.DeepBlackRatioEngine
+import com.cptodix.rimalux.oled.wallpaper.engine.FreshnessLedger
 import com.cptodix.rimalux.oled.wallpaper.engine.PaletteMode
 import com.cptodix.rimalux.oled.wallpaper.engine.PatternCategory
 import com.cptodix.rimalux.oled.wallpaper.engine.PatternWeightMode
@@ -141,7 +143,7 @@ class CoreEnginePortabilityTest {
     fun pureJvm_wallpaperGeneratorEngine_synthesizesAll80PatternsWithAccurateAnalyticalBlackRatios() {
         assertEquals(4, PatternCategory.entries.size)
         assertEquals(80, ArtPattern.entries.size)
-        assertEquals(41, StarterPalettes.defaults.size)
+        assertEquals(56, StarterPalettes.defaults.size)
 
         val targetRatios = floatArrayOf(0.25f, 0.60f, 0.85f)
         val deviations = ArrayList<String>()
@@ -528,5 +530,105 @@ class CoreEnginePortabilityTest {
         )
         val brightBgAlpha = (brightBgInk ushr 24) and 0xFF
         assertTrue("Expected subtle dark-ink alpha on bright pastel fill, got $brightBgAlpha", brightBgAlpha in 120..156)
+    }
+
+    @Test
+    fun pureJvm_controlledFreshnessEngine_guaranteesFullSweepNoRepeatsCategorySpacingAndDiverseStockPalettes() {
+        // 1. StarterPalettes invariants: 56 unique IDs, distinct swatch sets, zero #000000
+        assertEquals(56, StarterPalettes.defaults.size)
+        val starterIds = StarterPalettes.defaults.map { it.id }
+        assertEquals("Starter palette IDs must be unique", starterIds.size, starterIds.toSet().size)
+        val swatchSignatures = StarterPalettes.defaults.map { it.colors }
+        assertEquals("Stock palettes must have distinct swatch compositions", swatchSignatures.size, swatchSignatures.toSet().size)
+        for (pal in StarterPalettes.defaults) {
+            assertTrue("Palette ${pal.id} must have >= 4 swatches", pal.colors.size >= 4)
+            assertTrue("Palette ${pal.id} must never contain #000000", pal.colors.none { (it and 0xFFFFFFL) == 0L })
+        }
+
+        // 2. Full 80-pattern shuffle-bag sweep: zero pattern repeats and zero consecutive same-category runs
+        var ledger = FreshnessLedger()
+        val seenPatterns = ArrayList<ArtPattern>(ArtPattern.entries.size)
+        val seenCategories = ArrayList<PatternCategory>(ArtPattern.entries.size)
+        val spec = CoreGenerationSpec(
+            patternsRandomized = true,
+            paletteMode = PaletteMode.RANDOMIZED
+        )
+        val rng = Random(20261128L)
+        val harmonySequence = ArrayList<Int>()
+        val hueSectors = ArrayList<Int>()
+
+        repeat(ArtPattern.entries.size) { idx ->
+            val seed = 100_000L + idx * 7919L
+            val outcome = WallpaperGeneratorEngine.synthesizeControlled(
+                seed = seed,
+                spec = spec,
+                ledger = ledger,
+                rng = rng
+            )
+            seenPatterns.add(outcome.wallpaper.pattern)
+            seenCategories.add(outcome.wallpaper.pattern.category)
+            ledger = outcome.updatedLedger
+            ledger.recentHarmonyTypes.lastOrNull()?.let { harmonySequence.add(it) }
+            ledger.recentHueSectors.lastOrNull()?.let { hueSectors.add(it) }
+        }
+
+        assertEquals(
+            "All 80 patterns must appear exactly once before any repeat in shuffle-bag mode",
+            ArtPattern.entries.size,
+            seenPatterns.toSet().size
+        )
+
+        var consecutiveSameCategory = 0
+        for (i in 1 until seenCategories.size) {
+            if (seenCategories[i] == seenCategories[i - 1]) {
+                consecutiveSameCategory++
+            }
+        }
+        assertTrue(
+            "Expected minimal/zero consecutive same-category runs across 80-pattern sweep, got $consecutiveSameCategory",
+            consecutiveSameCategory <= 2
+        )
+
+        // Verify adjacent randomized palettes never repeat the same harmony type back-to-back
+        for (i in 1 until harmonySequence.size) {
+            assertNotEquals(
+                "Adjacent randomized palettes must not repeat harmony type ${harmonySequence[i]}",
+                harmonySequence[i - 1],
+                harmonySequence[i]
+            )
+        }
+        assertTrue(
+            "Expected wide harmony diversity across generations",
+            harmonySequence.toSet().size >= 8
+        )
+        assertTrue(
+            "Expected broad hue sector diversity across generations",
+            hueSectors.toSet().size >= 8
+        )
+
+        // 3. Full 56-palette PALETTE_LIST sweep: zero palette repeats before exhausting all selected palettes
+        var palLedger = FreshnessLedger()
+        val listSpec = CoreGenerationSpec(
+            patternsRandomized = true,
+            paletteMode = PaletteMode.PALETTE_LIST,
+            selectedPaletteIds = StarterPalettes.defaults.map { it.id }.toSet()
+        )
+        val chosenColorLists = ArrayList<List<Long>>(StarterPalettes.defaults.size)
+        repeat(StarterPalettes.defaults.size) { idx ->
+            val outcome = ControlledFreshnessEngine.synthesizeControlled(
+                seed = 700_000L + idx * 3571L,
+                spec = listSpec,
+                ledger = palLedger,
+                availablePalettes = StarterPalettes.defaults,
+                rng = Random(4242L + idx)
+            )
+            chosenColorLists.add(outcome.wallpaper.paletteColors)
+            palLedger = outcome.updatedLedger
+        }
+        assertEquals(
+            "All 56 stock palettes must be visited once before any repeat",
+            StarterPalettes.defaults.size,
+            chosenColorLists.toSet().size
+        )
     }
 }

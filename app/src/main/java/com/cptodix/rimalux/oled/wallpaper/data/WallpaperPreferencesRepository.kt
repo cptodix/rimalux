@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.cptodix.rimalux.oled.wallpaper.engine.FreshnessLedger
 import com.cptodix.rimalux.oled.wallpaper.model.ArtPattern
 import com.cptodix.rimalux.oled.wallpaper.model.ColorFillMode
 import com.cptodix.rimalux.oled.wallpaper.model.ColorPalette
@@ -63,7 +64,9 @@ data class StoredWallpaperState(
     val history: List<GeneratedHistoryItem> = emptyList(),
     val hasSeenGestureTutorial: Boolean = false,
     val lastGestureTimestamps: Map<StudioGestureAction, Long> = emptyMap(),
-    val appLanguageTag: String? = null
+    val appLanguageTag: String? = null,
+    val freshnessLedger: FreshnessLedger = FreshnessLedger(),
+    val asleepCycleCounter: Int = 0
 )
 
 class WallpaperPreferencesRepository(private val context: Context) {
@@ -97,6 +100,8 @@ class WallpaperPreferencesRepository(private val context: Context) {
         val HISTORY_JSON = stringPreferencesKey("history_json")
         val HAS_SEEN_GESTURE_TUTORIAL = booleanPreferencesKey("has_seen_gesture_tutorial")
         val APP_LANGUAGE_TAG = stringPreferencesKey("app_language_tag")
+        val FRESHNESS_LEDGER_JSON = stringPreferencesKey("freshness_ledger_json")
+        val ASLEEP_CYCLE_COUNTER = intPreferencesKey("asleep_cycle_counter")
 
         fun gestureTimestampKey(action: StudioGestureAction): Preferences.Key<Long> =
             longPreferencesKey("last_gesture_${action.id}")
@@ -123,7 +128,9 @@ class WallpaperPreferencesRepository(private val context: Context) {
             history = decodeHistory(prefs[Keys.HISTORY_JSON]),
             hasSeenGestureTutorial = prefs[Keys.HAS_SEEN_GESTURE_TUTORIAL] ?: false,
             lastGestureTimestamps = gestureTimestamps,
-            appLanguageTag = prefs[Keys.APP_LANGUAGE_TAG]
+            appLanguageTag = prefs[Keys.APP_LANGUAGE_TAG],
+            freshnessLedger = decodeFreshnessLedger(prefs[Keys.FRESHNESS_LEDGER_JSON]),
+            asleepCycleCounter = (prefs[Keys.ASLEEP_CYCLE_COUNTER] ?: 0).coerceAtLeast(0)
         )
     }.flowOn(Dispatchers.IO)
 
@@ -174,11 +181,21 @@ class WallpaperPreferencesRepository(private val context: Context) {
         if (decoded == null) {
             return StarterPalettes.defaults.filterNot { it.id in deletedIds }.ifEmpty { StarterPalettes.defaults }
         }
-        val existingIds = decoded.map { it.id }.toSet()
+        val starterById = StarterPalettes.defaults.associateBy { it.id }
+        val refreshedExisting = decoded.mapNotNull { existing ->
+            if (existing.id in deletedIds) {
+                null
+            } else {
+                // Upgrade stock starter swatches & titles cleanly on app updates while preserving
+                // every user-created custom palette untouched.
+                starterById[existing.id] ?: existing
+            }
+        }
+        val existingIds = refreshedExisting.map { it.id }.toSet()
         val missingStarters = StarterPalettes.defaults.filter {
             it.id !in existingIds && it.id !in deletedIds
         }
-        return (decoded + missingStarters).ifEmpty { StarterPalettes.defaults }
+        return (refreshedExisting + missingStarters).ifEmpty { StarterPalettes.defaults }
     }
 
     private fun parseConfigFromPrefs(prefs: Preferences, palettes: List<ColorPalette>): GeneratorConfig {
@@ -261,7 +278,11 @@ class WallpaperPreferencesRepository(private val context: Context) {
         Unit
     }
 
-    suspend fun recordGeneration(item: GeneratedHistoryItem, isAutoTick: Boolean = false) = withContext(Dispatchers.IO) {
+    suspend fun recordGeneration(
+        item: GeneratedHistoryItem,
+        isAutoTick: Boolean = false,
+        freshnessLedger: FreshnessLedger? = null
+    ) = withContext(Dispatchers.IO) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = item.seed
             prefs[Keys.CURRENT_GEOMETRY_SEED] = item.geometrySeed
@@ -273,6 +294,9 @@ class WallpaperPreferencesRepository(private val context: Context) {
             if (isAutoTick) {
                 prefs[Keys.LAST_AUTO_EXEC_MILLIS] = item.timestampMillis
             }
+            if (freshnessLedger != null) {
+                prefs[Keys.FRESHNESS_LEDGER_JSON] = encodeFreshnessLedger(freshnessLedger)
+            }
             val existing = decodeHistory(prefs[Keys.HISTORY_JSON])
             val updated = (listOf(item) + existing.filterNot { it.seed == item.seed }).take(24)
             prefs[Keys.HISTORY_JSON] = encodeHistory(updated)
@@ -283,7 +307,9 @@ class WallpaperPreferencesRepository(private val context: Context) {
     suspend fun recordAutoRotationAtomically(
         primaryItem: GeneratedHistoryItem,
         secondaryHistoryItem: GeneratedHistoryItem? = null,
-        nextRunEpochMillis: Long? = null
+        nextRunEpochMillis: Long? = null,
+        freshnessLedger: FreshnessLedger? = null,
+        asleepCycleCounter: Int = 0
     ) = withContext(Dispatchers.IO) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = primaryItem.seed
@@ -294,8 +320,12 @@ class WallpaperPreferencesRepository(private val context: Context) {
             prefs[Keys.CURRENT_BLACK_RATIO] = primaryItem.pitchBlackRatio.coerceIn(0f, 0.95f)
             prefs[Keys.CURRENT_INTRICACY] = primaryItem.intricacy.coerceIn(0.15f, 1.0f)
             prefs[Keys.LAST_AUTO_EXEC_MILLIS] = primaryItem.timestampMillis
+            prefs[Keys.ASLEEP_CYCLE_COUNTER] = asleepCycleCounter.coerceAtLeast(0)
             if (nextRunEpochMillis != null) {
                 prefs[Keys.NEXT_RUN_MILLIS] = nextRunEpochMillis
+            }
+            if (freshnessLedger != null) {
+                prefs[Keys.FRESHNESS_LEDGER_JSON] = encodeFreshnessLedger(freshnessLedger)
             }
             val existing = decodeHistory(prefs[Keys.HISTORY_JSON])
             val prepended = if (secondaryHistoryItem != null && secondaryHistoryItem.seed != primaryItem.seed) {
@@ -310,9 +340,39 @@ class WallpaperPreferencesRepository(private val context: Context) {
         Unit
     }
 
+    suspend fun recordAsleepSkipAtomically(
+        nextRunEpochMillis: Long?,
+        nextAsleepCycleCounter: Int
+    ) = withContext(Dispatchers.IO) {
+        context.applicationContext.rimaluxDataStore.edit { prefs ->
+            prefs[Keys.ASLEEP_CYCLE_COUNTER] = nextAsleepCycleCounter.coerceAtLeast(1)
+            if (nextRunEpochMillis != null) {
+                prefs[Keys.NEXT_RUN_MILLIS] = nextRunEpochMillis
+            }
+        }
+        Unit
+    }
+
+    suspend fun resetAsleepCycleCounter() = withContext(Dispatchers.IO) {
+        context.applicationContext.rimaluxDataStore.edit { prefs ->
+            if ((prefs[Keys.ASLEEP_CYCLE_COUNTER] ?: 0) != 0) {
+                prefs[Keys.ASLEEP_CYCLE_COUNTER] = 0
+            }
+        }
+        Unit
+    }
+
+    suspend fun saveFreshnessLedger(ledger: FreshnessLedger) = withContext(Dispatchers.IO) {
+        context.applicationContext.rimaluxDataStore.edit { prefs ->
+            prefs[Keys.FRESHNESS_LEDGER_JSON] = encodeFreshnessLedger(ledger)
+        }
+        Unit
+    }
+
     suspend fun saveTimelineState(
         current: GeneratedHistoryItem,
-        pastNewestFirst: List<GeneratedHistoryItem>
+        pastNewestFirst: List<GeneratedHistoryItem>,
+        freshnessLedger: FreshnessLedger? = null
     ) = withContext(Dispatchers.IO) {
         context.applicationContext.rimaluxDataStore.edit { prefs ->
             prefs[Keys.CURRENT_SEED] = current.seed
@@ -322,6 +382,9 @@ class WallpaperPreferencesRepository(private val context: Context) {
             prefs[Keys.CURRENT_COLORS_JSON] = encodeLongList(current.paletteColors)
             prefs[Keys.CURRENT_BLACK_RATIO] = current.pitchBlackRatio.coerceIn(0f, 0.95f)
             prefs[Keys.CURRENT_INTRICACY] = current.intricacy.coerceIn(0.15f, 1.0f)
+            if (freshnessLedger != null) {
+                prefs[Keys.FRESHNESS_LEDGER_JSON] = encodeFreshnessLedger(freshnessLedger)
+            }
             val combined = (listOf(current) + pastNewestFirst.filterNot { it.seed == current.seed }).take(24)
             prefs[Keys.HISTORY_JSON] = encodeHistory(combined)
         }
@@ -349,6 +412,22 @@ class WallpaperPreferencesRepository(private val context: Context) {
                 val updatedSelected = snapshot.config.selectedPaletteIds + palette.id
                 prefs[Keys.SELECTED_PALETTE_IDS] = encodeStringSet(updatedSelected)
                 prefs[Keys.CURRENT_COLORS_JSON] = encodeLongList(palette.colors)
+            }
+        }
+        Unit
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal suspend fun writeRawPalettesJsonForTest(
+        rawPalettesJson: String,
+        deletedIds: Set<String> = emptySet(),
+        selectedIds: Set<String> = emptySet()
+    ) = withContext(Dispatchers.IO) {
+        context.applicationContext.rimaluxDataStore.edit { prefs ->
+            prefs[Keys.USER_PALETTES_JSON] = rawPalettesJson
+            prefs[Keys.DELETED_PALETTE_IDS] = encodeStringSet(deletedIds)
+            if (selectedIds.isNotEmpty()) {
+                prefs[Keys.SELECTED_PALETTE_IDS] = encodeStringSet(selectedIds)
             }
         }
         Unit
@@ -517,5 +596,43 @@ class WallpaperPreferencesRepository(private val context: Context) {
             }
             result
         }.getOrDefault(emptyList())
+    }
+
+    private fun encodeFreshnessLedger(ledger: FreshnessLedger): String {
+        val obj = JSONObject()
+        obj.put("seenP", JSONArray(ledger.seenPatternIds))
+        obj.put("recentP", JSONArray(ledger.recentPatternIds))
+        obj.put("recentC", JSONArray(ledger.recentCategoryIds))
+        obj.put("seenPal", JSONArray(ledger.seenPaletteIds))
+        obj.put("recentPal", JSONArray(ledger.recentPaletteIds))
+        obj.put("recentH", JSONArray(ledger.recentHarmonyTypes))
+        obj.put("recentS", JSONArray(ledger.recentHueSectors))
+        obj.put("lastI", ledger.lastIntricacy.toDouble())
+        return obj.toString()
+    }
+
+    private fun decodeFreshnessLedger(raw: String?): FreshnessLedger {
+        if (raw.isNullOrBlank()) return FreshnessLedger()
+        return runCatching {
+            val obj = JSONObject(raw)
+            fun jsonStringList(key: String): List<String> {
+                val arr = obj.optJSONArray(key) ?: return emptyList()
+                return List(arr.length()) { arr.optString(it) }.filter { it.isNotBlank() }
+            }
+            fun jsonIntList(key: String): List<Int> {
+                val arr = obj.optJSONArray(key) ?: return emptyList()
+                return List(arr.length()) { arr.optInt(it) }
+            }
+            FreshnessLedger(
+                seenPatternIds = jsonStringList("seenP"),
+                recentPatternIds = jsonStringList("recentP"),
+                recentCategoryIds = jsonStringList("recentC"),
+                seenPaletteIds = jsonStringList("seenPal"),
+                recentPaletteIds = jsonStringList("recentPal"),
+                recentHarmonyTypes = jsonIntList("recentH"),
+                recentHueSectors = jsonIntList("recentS"),
+                lastIntricacy = obj.optDouble("lastI", -1.0).toFloat()
+            )
+        }.getOrDefault(FreshnessLedger())
     }
 }

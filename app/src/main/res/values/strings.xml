@@ -521,4 +521,19 @@
     <string name="palette_name_lunar_frost">Lunar Frost</string>
     <string name="palette_name_obsidian_ember">Obsidian Ember</string>
     <string name="palette_name_blackfire_opal">Blackfire Opal</string>
+    <string name="palette_name_obsidian_jade">Jade Velvet</string>
+    <string name="palette_name_cobalt_vermilion">Cobalt &amp; Vermilion</string>
+    <string name="palette_name_sunlit_coral">Sunlit Coral</string>
+    <string name="palette_name_kyoto_moss">Kyoto Moss</string>
+    <string name="palette_name_amalfi_azure">Amalfi Azure</string>
+    <string name="palette_name_burgundy_champagne">Velvet Bordeaux</string>
+    <string name="palette_name_lagoon_mint">Lagoon Breeze</string>
+    <string name="palette_name_tangerine_dusk">Tangerine Dusk</string>
+    <string name="palette_name_iridescent_pearl">Iridescent Pearl</string>
+    <string name="palette_name_forest_fern">Emerald Canopy</string>
+    <string name="palette_name_indigo_silk">Midnight Indigo</string>
+    <string name="palette_name_honey_ember">Saffron &amp; Honey</string>
+    <string name="palette_name_neon_botanica">Prism Flora</string>
+    <string name="palette_name_espresso_cream">Roast &amp; Ivory</string>
+    <string name="palette_name_violet_citrus">Orchid &amp; Yuzu</string>
 </resources>

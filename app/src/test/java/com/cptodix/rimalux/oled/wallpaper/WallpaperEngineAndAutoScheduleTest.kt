@@ -963,4 +963,240 @@ class WallpaperEngineAndAutoScheduleTest {
             Shadows.shadowOf(Looper.getMainLooper()).idle()
         }
     }
+
+    @Test
+    fun sharedFreshnessEngine_coordinatesAcrossPreviewAndAutoChangeAndProtects15mOvernightSleep() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        val repository = WallpaperPreferencesRepository(context)
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val shadowPowerManager = Shadows.shadowOf(powerManager)
+        val viewModelStore = ViewModelStore()
+
+        try {
+            WallpaperScheduler.cancelAll(context)
+            shadowPowerManager.setIsInteractive(true)
+            shadowPowerManager.setIsDeviceIdleMode(false)
+
+            repository.updateConfig {
+                GeneratorConfig(
+                    autoRotateEnabled = true,
+                    intervalMinutes = 15,
+                    patternsRandomized = true
+                )
+            }
+
+            // 1. Preview ViewModel swipes forward 5 times -> updates shared FreshnessLedger without pattern repeats
+            val viewModel = ViewModelProvider(
+                viewModelStore,
+                RimaluxViewModel.Factory(context)
+            )[RimaluxViewModel::class.java]
+
+            awaitMainIdleUntil {
+                viewModel.uiState.value.preview != null &&
+                    !viewModel.uiState.value.isGeneratingPreview &&
+                    viewModel.uiState.value.aheadReadyCount >= 2
+            }
+
+            val observedPatterns = LinkedHashSet<ArtPattern>()
+            observedPatterns.add(requireNotNull(viewModel.uiState.value.preview).pattern)
+
+            repeat(5) {
+                val prevSeed = requireNotNull(viewModel.uiState.value.preview).seed
+                assertTrue(viewModel.swipeLeftToNextWallpaper())
+                awaitMainIdleUntil {
+                    val cur = viewModel.uiState.value.preview
+                    cur != null && cur.seed != prevSeed && !viewModel.uiState.value.isGeneratingPreview
+                }
+                observedPatterns.add(requireNotNull(viewModel.uiState.value.preview).pattern)
+            }
+            assertEquals("Expected 6 unique patterns across initial + 5 swipes", 6, observedPatterns.size)
+
+            // Wait for asynchronous timeline persistence to flush FreshnessLedger to DataStore
+            val flushDeadline = System.currentTimeMillis() + 6_000L
+            while (repository.getSnapshot().freshnessLedger.seenPatternIds.size < 6 &&
+                System.currentTimeMillis() < flushDeadline
+            ) {
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
+                delay(25L)
+            }
+            assertTrue(
+                "Expected FreshnessLedger in DataStore to record all 6 previewed patterns",
+                repository.getSnapshot().freshnessLedger.seenPatternIds.size >= 6
+            )
+
+            // 2. Background Auto-Change continues from the SAME shared FreshnessLedger without repeating preview patterns
+            repeat(6) {
+                val snap = repository.getSnapshot()
+                if (snap.history.isNotEmpty()) {
+                    repository.recordGeneration(
+                        snap.history.first().copy(timestampMillis = System.currentTimeMillis() - 20 * 60_000L),
+                        isAutoTick = true
+                    )
+                }
+                val autoRes = WallpaperScheduler.executeAutoRotationCycle(
+                    context = context,
+                    wasScheduled = true,
+                    force = false
+                )
+                assertTrue(autoRes is WallpaperApplyResult.Success)
+                val success = autoRes as WallpaperApplyResult.Success
+                assertFalse(success.skippedAsDuplicate)
+                assertFalse(success.skippedWhileAsleep)
+                observedPatterns.add(repository.getSnapshot().currentPattern!!)
+            }
+            assertEquals(
+                "Shared freshness ledger must yield 12 unique patterns across 6 previews + 6 auto-changes",
+                12,
+                observedPatterns.size
+            )
+
+            // 3. Simulate sleeping overnight with a fast 15m interval (!isInteractive):
+            // Tick #1 while screen is off rotates once so waking up shows a fresh wallpaper.
+            shadowPowerManager.setIsInteractive(false)
+            shadowPowerManager.setIsDeviceIdleMode(false)
+            val preSleepSnap = repository.getSnapshot()
+            repository.recordGeneration(
+                preSleepSnap.history.first().copy(timestampMillis = System.currentTimeMillis() - 20 * 60_000L),
+                isAutoTick = true
+            )
+            val firstSleepTick = WallpaperScheduler.executeAutoRotationCycle(
+                context = context,
+                wasScheduled = true,
+                force = false
+            ) as WallpaperApplyResult.Success
+            assertFalse(firstSleepTick.skippedWhileAsleep)
+            val sleepSeedAfterFirstTick = repository.getSnapshot().currentSeed
+            val seenCountAfterFirstSleepTick = repository.getSnapshot().freshnessLedger.seenPatternIds.size
+            assertEquals(1, repository.getSnapshot().asleepCycleCounter)
+
+            // Subsequent ticks #2, #3, #4 while screen remains off are skipped without burning unseen patterns!
+            repeat(3) {
+                val snap = repository.getSnapshot()
+                repository.recordGeneration(
+                    snap.history.first().copy(timestampMillis = System.currentTimeMillis() - 20 * 60_000L),
+                    isAutoTick = true
+                )
+                val skippedSleepTick = WallpaperScheduler.executeAutoRotationCycle(
+                    context = context,
+                    wasScheduled = true,
+                    force = false
+                ) as WallpaperApplyResult.Success
+                assertTrue("Expected fast 15m tick while asleep to be paced", skippedSleepTick.skippedWhileAsleep)
+                assertEquals(sleepSeedAfterFirstTick, repository.getSnapshot().currentSeed)
+                assertEquals(seenCountAfterFirstSleepTick, repository.getSnapshot().freshnessLedger.seenPatternIds.size)
+            }
+            assertEquals(4, repository.getSnapshot().asleepCycleCounter)
+
+            // Entering deep Doze allows up to 7 skips before an occasional refresh
+            shadowPowerManager.setIsDeviceIdleMode(true)
+            val dozeSnap = repository.getSnapshot()
+            repository.recordGeneration(
+                dozeSnap.history.first().copy(timestampMillis = System.currentTimeMillis() - 20 * 60_000L),
+                isAutoTick = true
+            )
+            val dozeTick = WallpaperScheduler.executeAutoRotationCycle(
+                context = context,
+                wasScheduled = true,
+                force = false
+            ) as WallpaperApplyResult.Success
+            assertTrue("Deep Doze at asleepCycleCounter=4 must stay paused", dozeTick.skippedWhileAsleep)
+
+            // 4. User wakes the phone up (isInteractive = true): next scheduled 15m tick rotates immediately & resets counter
+            shadowPowerManager.setIsDeviceIdleMode(false)
+            shadowPowerManager.setIsInteractive(true)
+            val wakeSnap = repository.getSnapshot()
+            repository.recordGeneration(
+                wakeSnap.history.first().copy(timestampMillis = System.currentTimeMillis() - 20 * 60_000L),
+                isAutoTick = true
+            )
+            val wakeTick = WallpaperScheduler.executeAutoRotationCycle(
+                context = context,
+                wasScheduled = true,
+                force = false
+            ) as WallpaperApplyResult.Success
+            assertFalse("Waking phone must immediately resume normal auto-change", wakeTick.skippedWhileAsleep)
+            assertNotEquals(sleepSeedAfterFirstTick, repository.getSnapshot().currentSeed)
+            assertEquals(0, repository.getSnapshot().asleepCycleCounter)
+        } finally {
+            shadowPowerManager.setIsInteractive(true)
+            shadowPowerManager.setIsDeviceIdleMode(false)
+            viewModelStore.clear()
+            WallpaperScheduler.cancelAll(context)
+            repository.updateConfig { GeneratorConfig() }
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    @Test
+    fun existingInstallPaletteMigration_upgradesStockSwatchesAddsNewPalettesAndPreservesCustomAndDeletedPalettes() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val repository = WallpaperPreferencesRepository(context)
+
+        val customPalette = com.cptodix.rimalux.oled.wallpaper.model.ColorPalette(
+            id = "custom_legacy_user_1",
+            name = "My Legacy Custom",
+            colors = listOf(0xFF123456L, 0xFFABCDEFL, 0xFFF0E1D2L, 0xFF224466L)
+        )
+        val legacyImperialOldColors = listOf(0xFFFFD166L, 0xFFF4A261L, 0xFFE76F51L, 0xFF2A9D8FL, 0xFFE9C46AL)
+
+        // Build an exact pre-update USER_PALETTES_JSON payload containing old imperial_gold colors,
+        // a user-created custom palette, and NO newly added palettes, with pastel_macaron deleted.
+        val legacyPayload = org.json.JSONArray().apply {
+            put(
+                org.json.JSONObject().apply {
+                    put("id", "imperial_gold")
+                    put("name", "Imperial Gold")
+                    put("colors", org.json.JSONArray(legacyImperialOldColors))
+                }
+            )
+            put(
+                org.json.JSONObject().apply {
+                    put("id", customPalette.id)
+                    put("name", customPalette.name)
+                    put("colors", org.json.JSONArray(customPalette.colors))
+                }
+            )
+        }.toString()
+
+        repository.writeRawPalettesJsonForTest(
+            rawPalettesJson = legacyPayload,
+            deletedIds = setOf("pastel_macaron"),
+            selectedIds = setOf("imperial_gold", customPalette.id)
+        )
+
+        val migratedSnapshot = repository.getSnapshot()
+        assertEquals(
+            "Expected 55 stock palettes (56 stock minus 1 deleted) + 1 custom = 56",
+            56,
+            migratedSnapshot.userPalettes.size
+        )
+        assertTrue(
+            "Custom user palette must remain intact after update",
+            migratedSnapshot.userPalettes.any { it.id == customPalette.id && it.colors == customPalette.colors && it.name == customPalette.name }
+        )
+        assertFalse(
+            "Deleted stock palette must NOT be resurrected on update",
+            migratedSnapshot.userPalettes.any { it.id == "pastel_macaron" }
+        )
+        val upgradedImperial = migratedSnapshot.userPalettes.first { it.id == "imperial_gold" }
+        assertNotEquals(
+            "Stock palette should receive refined swatches rather than stale pre-update swatches",
+            legacyImperialOldColors,
+            upgradedImperial.colors
+        )
+        assertEquals(
+            com.cptodix.rimalux.oled.wallpaper.model.StarterPalettes.defaults.first { it.id == "imperial_gold" }.colors,
+            upgradedImperial.colors
+        )
+        assertTrue(
+            "New stock palettes should be added automatically on update",
+            migratedSnapshot.userPalettes.any { it.id == "obsidian_jade" } &&
+                migratedSnapshot.userPalettes.any { it.id == "violet_citrus" }
+        )
+        assertEquals(
+            setOf("imperial_gold", customPalette.id),
+            migratedSnapshot.config.selectedPaletteIds
+        )
+    }
 }
